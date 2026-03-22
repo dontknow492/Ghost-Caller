@@ -37,6 +37,11 @@ jobs:
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > keystore.jks
+          # Verify keystore exists
+          if [ ! -f keystore.jks ]; then
+            echo "❌ Keystore decoding failed!"
+            exit 1
+          fi
 
       # 🏗 Build APK + AAB
       - name: Build Release
@@ -53,26 +58,43 @@ jobs:
             -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
             -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
+      # 🔍 List built artifacts (for debugging)
+      - name: List Build Outputs
+        run: |
+          echo "📱 APKs:"
+          find . -name "*.apk" -type f
+          echo "📦 AABs:"
+          find . -name "*.aab" -type f
+
       # 📦 Collect outputs
       - name: Collect Artifacts
         run: |
-          mkdir release
+          mkdir -p release
           find . -type f \( -name "*.apk" -o -name "*.aab" \) -exec cp {} release/ \;
 
-      # 🏷 Rename APKs nicely
-      - name: Rename APKs
+      # 🏷 Rename APKs & AABs nicely
+      - name: Rename Artifacts
         run: |
           for file in release/*.apk; do
-            mv "$file" "release/ghostcaller-${GITHUB_REF_NAME}-$(basename $file)"
+            if [ -f "$file" ]; then
+              mv "$file" "release/ghostcaller-${GITHUB_REF_NAME}-$(basename "$file")"
+            fi
+          done
+          for file in release/*.aab; do
+            if [ -f "$file" ]; then
+              mv "$file" "release/ghostcaller-${GITHUB_REF_NAME}-$(basename "$file")"
+            fi
           done
 
       # 📝 Get commit message
       - name: Get Commit Message
         id: commit
         run: |
-          echo "msg=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+          echo "msg<<EOF" >> $GITHUB_OUTPUT
+          git log -1 --pretty=%B >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      # 🚀 Create Release
+      # 🚀 Create Release and Upload Artifacts
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -88,13 +110,6 @@ jobs:
             - Universal APK
             - ABI-specific APKs
             - Android App Bundle (AAB)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # 📤 Upload files
-      - name: Upload Artifacts
-        uses: softprops/action-gh-release@v2
-        with:
           files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
