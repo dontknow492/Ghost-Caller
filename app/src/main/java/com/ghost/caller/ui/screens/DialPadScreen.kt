@@ -80,6 +80,7 @@ import androidx.compose.ui.unit.sp
 import com.ghost.caller.R
 import com.ghost.caller.ui.components.DialPadButtonWithHaptics
 import com.ghost.caller.ui.components.DialPadKey
+import com.ghost.caller.ui.components.ModernSearchTextField
 import com.ghost.caller.viewmodel.CallLogEntry
 import com.ghost.caller.viewmodel.CallType
 import com.ghost.caller.viewmodel.CallViewModel
@@ -195,11 +196,14 @@ fun RecentCallsSection(
     viewModel: CallViewModel,
     permissionsGranted: Boolean,
     modifier: Modifier = Modifier,
-    onDialpadRequest: () -> Unit
+    onDialpadRequest: () -> Unit,
+
 ) {
     val context = LocalContext.current
-    val recentCalls by viewModel.recentCalls.collectAsState()
+    val recentCalls by viewModel.recentCallsFiltered.collectAsState()
     val materialTheme = MaterialTheme
+    val searchQuery by viewModel.searchQuery.collectAsState()
+
 
     val groupedCalls = remember(recentCalls) {
         groupCallsByDate(recentCalls) // Ensure this helper function is available in your scope
@@ -211,6 +215,13 @@ fun RecentCallsSection(
     ) {
         CenterAlignedTopAppBar(
             title = { Text("Recent Calls") }
+        )
+        ModernSearchTextField(
+            value = searchQuery,
+            onValueChange = { viewModel.filterValueChange(it) },
+            onSearch = { viewModel.filterValueChange(searchQuery) },
+            placeholder = "Search calls...",
+            modifier = Modifier.padding(horizontal = 12.dp)
         )
         Box(modifier = Modifier) {
             if (permissionsGranted && recentCalls.isNotEmpty()) {

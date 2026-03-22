@@ -25,6 +25,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -71,6 +75,27 @@ class CallViewModel(application: Application) : AndroidViewModel(application) {
 
     private var telephonyCallback: TelephonyCallback? = null
     private var phoneStateListener: PhoneStateListener? = null
+
+
+    private val _searchQuery = MutableStateFlow<String>("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+
+    val recentCallsFiltered = _recentCalls.combine(_searchQuery) { calls, query ->
+        if (query.isBlank()) {
+            calls
+        } else {
+            calls.filter { call ->
+                call.number.contains(query, ignoreCase = true) ||
+                        call.name?.contains(query, ignoreCase = true) == true
+            }
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
 
     init {
         // Start listening to phone state changes right away
@@ -457,6 +482,14 @@ class CallViewModel(application: Application) : AndroidViewModel(application) {
             Log.e("CallViewModel", "Missing WRITE_CALL_LOG permission!")
         }
     }
+
+    fun filterValueChange(value: String){
+        _searchQuery.update {
+            value
+        }
+    }
+
+
 }
 
 // ... (Your sealed classes and data classes remain the same) ...

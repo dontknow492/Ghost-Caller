@@ -75,6 +75,10 @@ android {
         }
     }
 
+    val isBundleBuild = gradle.startParameter.taskNames.any {
+        it.contains("bundle", ignoreCase = true)
+    }
+
     // 🔥 ABI SPLITS (multi-APK + universal)
     splits {
         abi {
