@@ -6,6 +6,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val isBundleBuild = gradle.startParameter.taskNames.any {
+    it.contains("bundle", ignoreCase = true)
+}
+
 android {
     namespace = "com.ghost.caller"
     compileSdk = 36
@@ -14,8 +18,8 @@ android {
         applicationId = "com.ghost.caller"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -75,14 +79,12 @@ android {
         }
     }
 
-    val isBundleBuild = gradle.startParameter.taskNames.any {
-        it.contains("bundle", ignoreCase = true)
-    }
+
 
     // 🔥 ABI SPLITS (multi-APK + universal)
     splits {
         abi {
-            isEnable = true
+            isEnable = !isBundleBuild
             reset()
 
             // Supported architectures
