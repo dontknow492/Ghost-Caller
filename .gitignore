@@ -15,3 +15,4 @@
 local.properties
 app/ghostcaller.jks
 keystore.txt
+app/release/*
