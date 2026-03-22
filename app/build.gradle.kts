@@ -22,14 +22,30 @@ android {
 
     // 🔥 Signing (optional but cleaner)
     signingConfigs {
-        getByName("debug")
-
         create("release") {
-            // TODO: replace with your real keystore later
-            storeFile = file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+
+            val keystorePath = System.getenv("KEYSTORE_FILE") ?: project.findProperty("KEYSTORE_FILE") as String?
+            val keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: project.findProperty("KEYSTORE_PASSWORD") as String?
+            val keyAliasVal = System.getenv("KEY_ALIAS") ?: project.findProperty("KEY_ALIAS") as String?
+            val keyPasswordVal = System.getenv("KEY_PASSWORD") ?: project.findProperty("KEY_PASSWORD") as String?
+
+            if (
+                keystorePath != null &&
+                keystorePassword != null &&
+                keyAliasVal != null &&
+                keyPasswordVal != null
+            ) {
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                keyAlias = keyAliasVal
+                keyPassword = keyPasswordVal
+            } else {
+                // Fallback (local dev only)
+                storeFile = File(System.getProperty("user.home"), ".android/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
 

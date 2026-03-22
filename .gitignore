@@ -13,5 +13,5 @@
 .externalNativeBuild
 .cxx
 local.properties
-ghostcaller.jks
+app/ghostcaller.jks
 keystore.txt
