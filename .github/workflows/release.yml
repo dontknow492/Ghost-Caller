@@ -33,12 +33,12 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # 🔐 Decode keystore
+      # 🔐 Decode keystore (FIXED PATH)
       - name: Decode Keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > keystore.jks
-          # Verify keystore exists
-          if [ ! -f keystore.jks ]; then
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystore.jks
+
+          if [ ! -f app/keystore.jks ]; then
             echo "❌ Keystore decoding failed!"
             exit 1
           fi
@@ -47,40 +47,36 @@ jobs:
       - name: 🏗 Build Release
         run: |
           ./gradlew assembleRelease bundleRelease \
-            -PKEYSTORE_FILE=keystore.jks \
+            -PKEYSTORE_FILE=app/keystore.jks \
             -PKEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }} \
             -PKEY_ALIAS=${{ secrets.KEY_ALIAS }} \
             -PKEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
 
-      # 🔍 List built artifacts (for debugging)
+      # 🔍 Debug outputs (cleaner)
       - name: List Build Outputs
         run: |
-          echo "📱 APKs:"
-          find . -name "*.apk" -type f
-          echo "📦 AABs:"
-          find . -name "*.aab" -type f
+          echo "📱 APK outputs:"
+          ls app/build/outputs/apk/release || true
+          echo "📦 AAB outputs:"
+          ls app/build/outputs/bundle/release || true
 
-      # 📦 Collect outputs
+      # 📦 Collect ONLY valid outputs (faster & safe)
       - name: Collect Artifacts
         run: |
           mkdir -p release
-          find . -type f \( -name "*.apk" -o -name "*.aab" \) -exec cp {} release/ \;
+          cp app/build/outputs/apk/release/*.apk release/ 2>/dev/null || true
+          cp app/build/outputs/bundle/release/*.aab release/ 2>/dev/null || true
 
-      # 🏷 Rename APKs & AABs nicely
+      # 🏷 Rename nicely
       - name: Rename Artifacts
         run: |
-          for file in release/*.apk; do
-            if [ -f "$file" ]; then
-              mv "$file" "release/ghostcaller-${GITHUB_REF_NAME}-$(basename "$file")"
-            fi
-          done
-          for file in release/*.aab; do
+          for file in release/*; do
             if [ -f "$file" ]; then
               mv "$file" "release/ghostcaller-${GITHUB_REF_NAME}-$(basename "$file")"
             fi
           done
 
-      # 📝 Get commit message
+      # 📝 Commit message
       - name: Get Commit Message
         id: commit
         run: |
@@ -88,7 +84,7 @@ jobs:
           git log -1 --pretty=%B >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      # 🚀 Create Release and Upload Artifacts
+      # 🚀 Create Release + Upload
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -100,10 +96,10 @@ jobs:
             📝 **Changes:**
             ${{ steps.commit.outputs.msg }}
 
-            📦 **Builds Included:**
+            📦 **Included:**
             - Universal APK
-            - ABI-specific APKs
-            - Android App Bundle (AAB)
+            - ABI APKs
+            - AAB (Play Store)
           files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
