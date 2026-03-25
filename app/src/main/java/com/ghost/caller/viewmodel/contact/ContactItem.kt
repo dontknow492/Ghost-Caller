@@ -2,30 +2,26 @@ package com.ghost.caller.viewmodel.contact
 
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
-import androidx.compose.foundation.lazy.staggeredgrid.items
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import com.ghost.caller.models.ContactQuickInfo
 import com.ghost.caller.ui.components.contact.ContactGridItem
 import com.ghost.caller.ui.components.contact.ContactListItem
-import com.ghost.caller.viewmodel.contact.ViewMode
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -52,7 +48,6 @@ fun ContactPagingList(
                     modifier = modifier,
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
-                    var lastHeader: String? = null
 
                     items(
                         count = pagingItems.itemCount,
@@ -115,8 +110,6 @@ fun ContactPagingList(
         }
     }
 }
-
-
 
 
 fun getSectionTitle(name: String): String {

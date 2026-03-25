@@ -4,36 +4,20 @@ package com.ghost.caller.ui.screens.contact
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.CallMade
-import androidx.compose.material.icons.automirrored.rounded.CallMissed
-import androidx.compose.material.icons.automirrored.rounded.CallReceived
-import androidx.compose.material.icons.rounded.Block
-import androidx.compose.material.icons.rounded.Call
-import androidx.compose.material.icons.rounded.CallMade
-import androidx.compose.material.icons.rounded.CallMissed
-import androidx.compose.material.icons.rounded.CallReceived
-import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SortByAlpha
-import androidx.compose.material.icons.rounded.Voicemail
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -48,9 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ghost.caller.repository.ContactSort
-import com.ghost.caller.viewmodel.recent.CallTypeFilter
-import com.ghost.caller.viewmodel.recent.DateRange
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

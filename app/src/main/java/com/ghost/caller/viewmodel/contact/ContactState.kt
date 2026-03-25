@@ -1,11 +1,15 @@
 // ContactState.kt
 package com.ghost.caller.viewmodel.contact
 
-import androidx.paging.PagingData
-import com.ghost.caller.models.*
+import com.ghost.caller.models.AddressData
+import com.ghost.caller.models.ContactGroup
+import com.ghost.caller.models.ContactQuickInfo
+import com.ghost.caller.models.ContactWithDetails
+import com.ghost.caller.models.EmailData
+import com.ghost.caller.models.OrganizationData
+import com.ghost.caller.models.PhoneNumberData
 import com.ghost.caller.repository.ContactFilter
 import com.ghost.caller.repository.ContactSort
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Contact UI State - For non-paginated, immediate UI state
@@ -43,7 +47,7 @@ data class ContactUiState(
     val contactSort: ContactSort = ContactSort.NAME_ASC,
 
 
-)
+    )
 
 /**
  * Contact UI Events (User Actions)
@@ -115,7 +119,9 @@ sealed class ContactSideEffect {
     data class NavigateToContactDetail(val contactId: String) : ContactSideEffect()
     data object NavigateToAddContact : ContactSideEffect()
     data class NavigateToEditContact(val contactId: String) : ContactSideEffect()
-    data class NavigateToGroupContacts(val groupId: String, val groupName: String) : ContactSideEffect()
+    data class NavigateToGroupContacts(val groupId: String, val groupName: String) :
+        ContactSideEffect()
+
     data object NavigateBack : ContactSideEffect()
 
     // Communication
@@ -126,7 +132,9 @@ sealed class ContactSideEffect {
     // User Feedback
     data class ShowToast(val message: String) : ContactSideEffect()
     data class ShowError(val message: String) : ContactSideEffect()
-    data class ShowDeleteConfirmation(val contactIds: List<String>, val count: Int) : ContactSideEffect()
+    data class ShowDeleteConfirmation(val contactIds: List<String>, val count: Int) :
+        ContactSideEffect()
+
     data class ShowSuccess(val message: String) : ContactSideEffect()
 
     // Events
@@ -134,7 +142,8 @@ sealed class ContactSideEffect {
     data class ContactsDeleted(val count: Int) : ContactSideEffect()
     data class ContactAdded(val contactId: String) : ContactSideEffect()
     data class ContactUpdated(val contactId: String) : ContactSideEffect()
-    data class ContactStarredToggled(val contactId: String, val isStarred: Boolean) : ContactSideEffect()
+    data class ContactStarredToggled(val contactId: String, val isStarred: Boolean) :
+        ContactSideEffect()
 }
 
 /**
@@ -147,7 +156,6 @@ enum class ViewMode {
 enum class ContactTab {
     CONTACTS, FAVORITES, RECENT, GROUPS, SEARCH
 }
-
 
 
 /**
@@ -182,9 +190,21 @@ data class ContactQuickInfoWithDisplay(
         private fun formatPhoneNumber(number: String): String {
             val cleaned = number.replace(Regex("[^\\d+]"), "")
             return when {
-                cleaned.length == 10 -> "${cleaned.substring(0, 3)}-${cleaned.substring(3, 6)}-${cleaned.substring(6)}"
+                cleaned.length == 10 -> "${cleaned.substring(0, 3)}-${
+                    cleaned.substring(
+                        3,
+                        6
+                    )
+                }-${cleaned.substring(6)}"
+
                 cleaned.length == 11 && cleaned.startsWith("1") ->
-                    "+1 ${cleaned.substring(1, 4)}-${cleaned.substring(4, 7)}-${cleaned.substring(7)}"
+                    "+1 ${cleaned.substring(1, 4)}-${
+                        cleaned.substring(
+                            4,
+                            7
+                        )
+                    }-${cleaned.substring(7)}"
+
                 else -> number
             }
         }

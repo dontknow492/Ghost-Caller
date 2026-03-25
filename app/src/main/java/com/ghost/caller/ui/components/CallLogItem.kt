@@ -10,7 +10,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -30,30 +29,10 @@ import androidx.compose.material.icons.automirrored.rounded.CallMade
 import androidx.compose.material.icons.automirrored.rounded.CallMissed
 import androidx.compose.material.icons.automirrored.rounded.CallReceived
 import androidx.compose.material.icons.automirrored.rounded.Message
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.CallMade
-import androidx.compose.material.icons.filled.CallMissed
-import androidx.compose.material.icons.filled.CallReceived
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Done
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Message
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.VoiceChat
 import androidx.compose.material.icons.rounded.Call
-import androidx.compose.material.icons.rounded.CallMade
-import androidx.compose.material.icons.rounded.CallMissed
-import androidx.compose.material.icons.rounded.CallReceived
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Message
 import androidx.compose.material.icons.rounded.Phone
-import androidx.compose.material3.Badge
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,7 +53,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ghost.caller.models.ContactType
 import com.ghost.caller.ui.components.contact.ContactAvatar
 import com.ghost.caller.ui.screens.recent.CallAction
@@ -202,7 +180,11 @@ fun CallLogItem(
                     ActionButton(Icons.Rounded.Info, "Info") {
                         onCallAction(CallAction.INFO)
                     }
-                    ActionButton(Icons.Rounded.Delete, "Delete", tint = MaterialTheme.colorScheme.error) {
+                    ActionButton(
+                        Icons.Rounded.Delete,
+                        "Delete",
+                        tint = MaterialTheme.colorScheme.error
+                    ) {
                         onCallAction(CallAction.DELETE)
                     }
                 }
@@ -276,7 +258,7 @@ fun ActionButton(
     tint: Color = MaterialTheme.colorScheme.primary,
     onClick: () -> Unit,
 
-) {
+    ) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),

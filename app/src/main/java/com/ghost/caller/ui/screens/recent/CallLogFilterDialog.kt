@@ -4,7 +4,6 @@ package com.ghost.caller.ui.screens.recent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,9 +16,6 @@ import androidx.compose.material.icons.automirrored.rounded.CallMissed
 import androidx.compose.material.icons.automirrored.rounded.CallReceived
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Call
-import androidx.compose.material.icons.rounded.CallMade
-import androidx.compose.material.icons.rounded.CallMissed
-import androidx.compose.material.icons.rounded.CallReceived
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.Voicemail
 import androidx.compose.material3.AlertDialog
@@ -41,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ghost.caller.viewmodel.recent.CallTypeFilter
 import com.ghost.caller.viewmodel.recent.DateRange
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

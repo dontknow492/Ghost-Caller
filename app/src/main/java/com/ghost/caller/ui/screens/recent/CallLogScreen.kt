@@ -281,8 +281,16 @@ fun CallLogScreen(
                                     },
                                     onCallLongClick = { call ->
                                         if (!state.isInSelectionMode) {
-                                            viewModel.sendEvent(CallLogEvent.ToggleSelectionMode(true))
-                                            viewModel.sendEvent(CallLogEvent.ToggleCallSelection(call.id))
+                                            viewModel.sendEvent(
+                                                CallLogEvent.ToggleSelectionMode(
+                                                    true
+                                                )
+                                            )
+                                            viewModel.sendEvent(
+                                                CallLogEvent.ToggleCallSelection(
+                                                    call.id
+                                                )
+                                            )
                                         }
                                     },
                                     onCallAction = { action, call ->
@@ -346,8 +354,16 @@ fun CallLogScreen(
                                     },
                                     onCallLongClick = { call ->
                                         if (!state.isInSelectionMode) {
-                                            viewModel.sendEvent(CallLogEvent.ToggleSelectionMode(true))
-                                            viewModel.sendEvent(CallLogEvent.ToggleCallSelection(call.id))
+                                            viewModel.sendEvent(
+                                                CallLogEvent.ToggleSelectionMode(
+                                                    true
+                                                )
+                                            )
+                                            viewModel.sendEvent(
+                                                CallLogEvent.ToggleCallSelection(
+                                                    call.id
+                                                )
+                                            )
                                         }
                                     },
                                     onCallAction = { action, call ->

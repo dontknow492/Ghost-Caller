@@ -2,12 +2,32 @@
 
 package com.ghost.caller.ui.screens.call
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -15,9 +35,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Backspace
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.SearchOff
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,7 +73,6 @@ import coil3.compose.AsyncImage
 import com.ghost.caller.presentation.call.CallViewModel
 import com.ghost.caller.viewmodel.call.CallEvent
 import com.ghost.caller.viewmodel.call.ContactSuggestion
-import com.ghost.caller.viewmodel.recent.CallLogViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -204,7 +238,9 @@ fun DialerScreen(
             visible = state.error != null,
             enter = fadeIn() + slideInVertically(),
             exit = fadeOut() + slideOutVertically(),
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 100.dp)
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 100.dp)
         ) {
             ErrorMessage(
                 message = state.error?.message ?: "",
@@ -392,11 +428,7 @@ private fun DialpadButton(
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
-                        if (event.changes.any { it.pressed }) {
-                            isPressed = true
-                        } else {
-                            isPressed = false
-                        }
+                        isPressed = event.changes.any { it.pressed }
                     }
                 }
             },
@@ -631,9 +663,16 @@ private fun formatPhoneNumber(number: String): String {
     val cleaned = number.replace(Regex("[^\\d+]"), "")
     return when {
         cleaned.length <= 7 -> cleaned
-        cleaned.length == 10 -> "${cleaned.substring(0, 3)}-${cleaned.substring(3, 6)}-${cleaned.substring(6)}"
+        cleaned.length == 10 -> "${cleaned.substring(0, 3)}-${
+            cleaned.substring(
+                3,
+                6
+            )
+        }-${cleaned.substring(6)}"
+
         cleaned.length == 11 && cleaned.startsWith("1") ->
             "+1 ${cleaned.substring(1, 4)}-${cleaned.substring(4, 7)}-${cleaned.substring(7)}"
+
         else -> cleaned
     }
 }

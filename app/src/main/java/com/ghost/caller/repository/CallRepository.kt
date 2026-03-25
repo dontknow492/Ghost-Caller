@@ -14,13 +14,31 @@ import androidx.core.content.ContextCompat
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
-import com.ghost.caller.models.*
+import com.ghost.caller.models.AddressData
+import com.ghost.caller.models.AddressType
+import com.ghost.caller.models.Contact
+import com.ghost.caller.models.ContactEvent
+import com.ghost.caller.models.ContactGroup
+import com.ghost.caller.models.ContactQuickInfo
+import com.ghost.caller.models.ContactType
+import com.ghost.caller.models.ContactWithDetails
+import com.ghost.caller.models.EmailAddress
+import com.ghost.caller.models.EmailData
+import com.ghost.caller.models.EmailType
+import com.ghost.caller.models.EventType
+import com.ghost.caller.models.Organization
+import com.ghost.caller.models.OrganizationData
+import com.ghost.caller.models.PhoneNumber
+import com.ghost.caller.models.PhoneNumberData
+import com.ghost.caller.models.PhoneNumberType
+import com.ghost.caller.models.PostalAddress
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.text.Collator
-import java.util.*
+import java.util.Calendar
+import java.util.Locale
 
 class ContactRepository(
     private val context: Context,
@@ -113,7 +131,7 @@ class ContactRepository(
             if (!hasContactsPermission()) return@withContext emptyMap()
 
             val groupedContacts = mutableMapOf<String, MutableList<ContactQuickInfo>>()
-            val collator = Collator.getInstance(Locale.getDefault())
+            Collator.getInstance(Locale.getDefault())
 
             try {
                 val projection = arrayOf(
@@ -181,11 +199,12 @@ class ContactRepository(
         withContext(ioDispatcher) {
             if (!hasContactsPermission()) return@withContext null
 
-            val contactId = if (identifier.contains("+") || identifier.any { it.isDigit() && !identifier.all { c -> c.isDigit() } }) {
-                getContactIdFromPhoneNumber(identifier) ?: return@withContext null
-            } else {
-                identifier
-            }
+            val contactId =
+                if (identifier.contains("+") || identifier.any { it.isDigit() && !identifier.all { c -> c.isDigit() } }) {
+                    getContactIdFromPhoneNumber(identifier) ?: return@withContext null
+                } else {
+                    identifier
+                }
 
             val contact = getContactById(contactId) ?: return@withContext null
 
@@ -244,8 +263,10 @@ class ContactRepository(
                     val nameIndex = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME)
                     val photoIndex = cursor.getColumnIndex(ContactsContract.Contacts.PHOTO_URI)
                     val starredIndex = cursor.getColumnIndex(ContactsContract.Contacts.STARRED)
-                    val lastContactedIndex = cursor.getColumnIndex(ContactsContract.Contacts.LAST_TIME_CONTACTED)
-                    val timesContactedIndex = cursor.getColumnIndex(ContactsContract.Contacts.TIMES_CONTACTED)
+                    val lastContactedIndex =
+                        cursor.getColumnIndex(ContactsContract.Contacts.LAST_TIME_CONTACTED)
+                    val timesContactedIndex =
+                        cursor.getColumnIndex(ContactsContract.Contacts.TIMES_CONTACTED)
                     val lookupKeyIndex = cursor.getColumnIndex(ContactsContract.Contacts.LOOKUP_KEY)
 
                     val displayName = cursor.getString(nameIndex) ?: "Unknown"
@@ -253,9 +274,12 @@ class ContactRepository(
                         cursor.getString(photoIndex)?.let { Uri.parse(it) }
                     } else null
                     val starred = starredIndex >= 0 && cursor.getInt(starredIndex) == 1
-                    val lastTimeContacted = if (lastContactedIndex >= 0) cursor.getLong(lastContactedIndex) else 0L
-                    val timesContacted = if (timesContactedIndex >= 0) cursor.getInt(timesContactedIndex) else 0
-                    val lookupKey = if (lookupKeyIndex >= 0) cursor.getString(lookupKeyIndex) ?: "" else ""
+                    val lastTimeContacted =
+                        if (lastContactedIndex >= 0) cursor.getLong(lastContactedIndex) else 0L
+                    val timesContacted =
+                        if (timesContactedIndex >= 0) cursor.getInt(timesContactedIndex) else 0
+                    val lookupKey =
+                        if (lookupKeyIndex >= 0) cursor.getString(lookupKeyIndex) ?: "" else ""
 
                     val phoneNumbers = getPhoneNumbers(contactId)
                     val emails = getEmails(contactId)
@@ -301,39 +325,40 @@ class ContactRepository(
         val selectionArgs = arrayOf(contactId)
 
         try {
-            context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
-                val idIndex = cursor.getColumnIndex(CommonDataKinds.Phone._ID)
-                val numberIndex = cursor.getColumnIndex(CommonDataKinds.Phone.NUMBER)
-                val typeIndex = cursor.getColumnIndex(CommonDataKinds.Phone.TYPE)
-                val labelIndex = cursor.getColumnIndex(CommonDataKinds.Phone.LABEL)
-                val primaryIndex = cursor.getColumnIndex(CommonDataKinds.Phone.IS_PRIMARY)
+            context.contentResolver.query(uri, projection, selection, selectionArgs, null)
+                ?.use { cursor ->
+                    val idIndex = cursor.getColumnIndex(CommonDataKinds.Phone._ID)
+                    val numberIndex = cursor.getColumnIndex(CommonDataKinds.Phone.NUMBER)
+                    val typeIndex = cursor.getColumnIndex(CommonDataKinds.Phone.TYPE)
+                    val labelIndex = cursor.getColumnIndex(CommonDataKinds.Phone.LABEL)
+                    val primaryIndex = cursor.getColumnIndex(CommonDataKinds.Phone.IS_PRIMARY)
 
-                while (cursor.moveToNext()) {
-                    val id = cursor.getString(idIndex)
-                    val number = cursor.getString(numberIndex) ?: continue
-                    val type = when (cursor.getInt(typeIndex)) {
-                        CommonDataKinds.Phone.TYPE_HOME -> PhoneNumberType.HOME
-                        CommonDataKinds.Phone.TYPE_WORK -> PhoneNumberType.WORK
-                        CommonDataKinds.Phone.TYPE_MOBILE -> PhoneNumberType.MOBILE
-                        CommonDataKinds.Phone.TYPE_OTHER -> PhoneNumberType.OTHER
-                        else -> PhoneNumberType.CUSTOM
-                    }
-                    val label = if (type == PhoneNumberType.CUSTOM) {
-                        cursor.getString(labelIndex)
-                    } else null
-                    val isPrimary = primaryIndex >= 0 && cursor.getInt(primaryIndex) == 1
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getString(idIndex)
+                        val number = cursor.getString(numberIndex) ?: continue
+                        val type = when (cursor.getInt(typeIndex)) {
+                            CommonDataKinds.Phone.TYPE_HOME -> PhoneNumberType.HOME
+                            CommonDataKinds.Phone.TYPE_WORK -> PhoneNumberType.WORK
+                            CommonDataKinds.Phone.TYPE_MOBILE -> PhoneNumberType.MOBILE
+                            CommonDataKinds.Phone.TYPE_OTHER -> PhoneNumberType.OTHER
+                            else -> PhoneNumberType.CUSTOM
+                        }
+                        val label = if (type == PhoneNumberType.CUSTOM) {
+                            cursor.getString(labelIndex)
+                        } else null
+                        val isPrimary = primaryIndex >= 0 && cursor.getInt(primaryIndex) == 1
 
-                    phoneNumbers.add(
-                        PhoneNumber(
-                            id = id,
-                            number = number,
-                            type = type,
-                            label = label,
-                            isPrimary = isPrimary
+                        phoneNumbers.add(
+                            PhoneNumber(
+                                id = id,
+                                number = number,
+                                type = type,
+                                label = label,
+                                isPrimary = isPrimary
+                            )
                         )
-                    )
+                    }
                 }
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Error getting phone numbers", e)
         }
@@ -360,38 +385,39 @@ class ContactRepository(
         val selectionArgs = arrayOf(contactId)
 
         try {
-            context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
-                val idIndex = cursor.getColumnIndex(CommonDataKinds.Email._ID)
-                val emailIndex = cursor.getColumnIndex(CommonDataKinds.Email.ADDRESS)
-                val typeIndex = cursor.getColumnIndex(CommonDataKinds.Email.TYPE)
-                val labelIndex = cursor.getColumnIndex(CommonDataKinds.Email.LABEL)
-                val primaryIndex = cursor.getColumnIndex(CommonDataKinds.Email.IS_PRIMARY)
+            context.contentResolver.query(uri, projection, selection, selectionArgs, null)
+                ?.use { cursor ->
+                    val idIndex = cursor.getColumnIndex(CommonDataKinds.Email._ID)
+                    val emailIndex = cursor.getColumnIndex(CommonDataKinds.Email.ADDRESS)
+                    val typeIndex = cursor.getColumnIndex(CommonDataKinds.Email.TYPE)
+                    val labelIndex = cursor.getColumnIndex(CommonDataKinds.Email.LABEL)
+                    val primaryIndex = cursor.getColumnIndex(CommonDataKinds.Email.IS_PRIMARY)
 
-                while (cursor.moveToNext()) {
-                    val id = cursor.getString(idIndex)
-                    val email = cursor.getString(emailIndex) ?: continue
-                    val type = when (cursor.getInt(typeIndex)) {
-                        CommonDataKinds.Email.TYPE_HOME -> EmailType.HOME
-                        CommonDataKinds.Email.TYPE_WORK -> EmailType.WORK
-                        CommonDataKinds.Email.TYPE_OTHER -> EmailType.OTHER
-                        else -> EmailType.CUSTOM
-                    }
-                    val label = if (type == EmailType.CUSTOM) {
-                        cursor.getString(labelIndex)
-                    } else null
-                    val isPrimary = primaryIndex >= 0 && cursor.getInt(primaryIndex) == 1
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getString(idIndex)
+                        val email = cursor.getString(emailIndex) ?: continue
+                        val type = when (cursor.getInt(typeIndex)) {
+                            CommonDataKinds.Email.TYPE_HOME -> EmailType.HOME
+                            CommonDataKinds.Email.TYPE_WORK -> EmailType.WORK
+                            CommonDataKinds.Email.TYPE_OTHER -> EmailType.OTHER
+                            else -> EmailType.CUSTOM
+                        }
+                        val label = if (type == EmailType.CUSTOM) {
+                            cursor.getString(labelIndex)
+                        } else null
+                        val isPrimary = primaryIndex >= 0 && cursor.getInt(primaryIndex) == 1
 
-                    emails.add(
-                        EmailAddress(
-                            id = id,
-                            email = email,
-                            type = type,
-                            label = label,
-                            isPrimary = isPrimary
+                        emails.add(
+                            EmailAddress(
+                                id = id,
+                                email = email,
+                                type = type,
+                                label = label,
+                                isPrimary = isPrimary
+                            )
                         )
-                    )
+                    }
                 }
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Error getting emails", e)
         }
@@ -413,34 +439,36 @@ class ContactRepository(
             CommonDataKinds.Organization.DEPARTMENT
         )
 
-        val selection = "${ContactsContract.Data.CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?"
+        val selection =
+            "${ContactsContract.Data.CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?"
         val selectionArgs = arrayOf(contactId, CommonDataKinds.Organization.CONTENT_ITEM_TYPE)
 
         try {
-            context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
-                val idIndex = cursor.getColumnIndex(CommonDataKinds.Organization._ID)
-                val companyIndex = cursor.getColumnIndex(CommonDataKinds.Organization.COMPANY)
-                val titleIndex = cursor.getColumnIndex(CommonDataKinds.Organization.TITLE)
-                val deptIndex = cursor.getColumnIndex(CommonDataKinds.Organization.DEPARTMENT)
+            context.contentResolver.query(uri, projection, selection, selectionArgs, null)
+                ?.use { cursor ->
+                    val idIndex = cursor.getColumnIndex(CommonDataKinds.Organization._ID)
+                    val companyIndex = cursor.getColumnIndex(CommonDataKinds.Organization.COMPANY)
+                    val titleIndex = cursor.getColumnIndex(CommonDataKinds.Organization.TITLE)
+                    val deptIndex = cursor.getColumnIndex(CommonDataKinds.Organization.DEPARTMENT)
 
-                while (cursor.moveToNext()) {
-                    val id = cursor.getString(idIndex)
-                    val company = cursor.getString(companyIndex) ?: ""
-                    val title = cursor.getString(titleIndex) ?: ""
-                    val department = cursor.getString(deptIndex) ?: ""
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getString(idIndex)
+                        val company = cursor.getString(companyIndex) ?: ""
+                        val title = cursor.getString(titleIndex) ?: ""
+                        val department = cursor.getString(deptIndex) ?: ""
 
-                    if (company.isNotEmpty() || title.isNotEmpty()) {
-                        organizations.add(
-                            Organization(
-                                id = id,
-                                name = company,
-                                title = title,
-                                department = department
+                        if (company.isNotEmpty() || title.isNotEmpty()) {
+                            organizations.add(
+                                Organization(
+                                    id = id,
+                                    name = company,
+                                    title = title,
+                                    department = department
+                                )
                             )
-                        )
+                        }
                     }
                 }
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Error getting organizations", e)
         }
@@ -470,44 +498,48 @@ class ContactRepository(
         val selectionArgs = arrayOf(contactId)
 
         try {
-            context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
-                val idIndex = cursor.getColumnIndex(CommonDataKinds.StructuredPostal._ID)
-                val formattedIndex = cursor.getColumnIndex(CommonDataKinds.StructuredPostal.FORMATTED_ADDRESS)
-                val typeIndex = cursor.getColumnIndex(CommonDataKinds.StructuredPostal.TYPE)
-                val streetIndex = cursor.getColumnIndex(CommonDataKinds.StructuredPostal.STREET)
-                val cityIndex = cursor.getColumnIndex(CommonDataKinds.StructuredPostal.CITY)
-                val regionIndex = cursor.getColumnIndex(CommonDataKinds.StructuredPostal.REGION)
-                val postcodeIndex = cursor.getColumnIndex(CommonDataKinds.StructuredPostal.POSTCODE)
-                val countryIndex = cursor.getColumnIndex(CommonDataKinds.StructuredPostal.COUNTRY)
+            context.contentResolver.query(uri, projection, selection, selectionArgs, null)
+                ?.use { cursor ->
+                    val idIndex = cursor.getColumnIndex(CommonDataKinds.StructuredPostal._ID)
+                    val formattedIndex =
+                        cursor.getColumnIndex(CommonDataKinds.StructuredPostal.FORMATTED_ADDRESS)
+                    val typeIndex = cursor.getColumnIndex(CommonDataKinds.StructuredPostal.TYPE)
+                    val streetIndex = cursor.getColumnIndex(CommonDataKinds.StructuredPostal.STREET)
+                    val cityIndex = cursor.getColumnIndex(CommonDataKinds.StructuredPostal.CITY)
+                    val regionIndex = cursor.getColumnIndex(CommonDataKinds.StructuredPostal.REGION)
+                    val postcodeIndex =
+                        cursor.getColumnIndex(CommonDataKinds.StructuredPostal.POSTCODE)
+                    val countryIndex =
+                        cursor.getColumnIndex(CommonDataKinds.StructuredPostal.COUNTRY)
 
-                while (cursor.moveToNext()) {
-                    val id = cursor.getString(idIndex)
-                    val formattedAddress = cursor.getString(formattedIndex) ?: ""
-                    val type = when (cursor.getInt(typeIndex)) {
-                        CommonDataKinds.StructuredPostal.TYPE_HOME -> AddressType.HOME
-                        CommonDataKinds.StructuredPostal.TYPE_WORK -> AddressType.WORK
-                        else -> AddressType.OTHER
-                    }
-                    val street = cursor.getString(streetIndex)
-                    val city = cursor.getString(cityIndex)
-                    val state = cursor.getString(regionIndex)
-                    val postalCode = cursor.getString(postcodeIndex)
-                    val country = cursor.getString(countryIndex)
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getString(idIndex)
+                        val formattedAddress = cursor.getString(formattedIndex) ?: ""
+                        val type = when (cursor.getInt(typeIndex)) {
+                            CommonDataKinds.StructuredPostal.TYPE_HOME -> AddressType.HOME
+                            CommonDataKinds.StructuredPostal.TYPE_WORK -> AddressType.WORK
+                            else -> AddressType.OTHER
+                        }
+                        val street = cursor.getString(streetIndex)
+                        val city = cursor.getString(cityIndex)
+                        val state = cursor.getString(regionIndex)
+                        val postalCode = cursor.getString(postcodeIndex)
+                        val country = cursor.getString(countryIndex)
 
-                    addresses.add(
-                        PostalAddress(
-                            id = id,
-                            formattedAddress = formattedAddress,
-                            type = type,
-                            street = street,
-                            city = city,
-                            state = state,
-                            postalCode = postalCode,
-                            country = country
+                        addresses.add(
+                            PostalAddress(
+                                id = id,
+                                formattedAddress = formattedAddress,
+                                type = type,
+                                street = street,
+                                city = city,
+                                state = state,
+                                postalCode = postalCode,
+                                country = country
+                            )
                         )
-                    )
+                    }
                 }
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Error getting addresses", e)
         }
@@ -524,20 +556,22 @@ class ContactRepository(
         val uri = ContactsContract.Data.CONTENT_URI
         val projection = arrayOf(CommonDataKinds.Website.URL)
 
-        val selection = "${ContactsContract.Data.CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?"
+        val selection =
+            "${ContactsContract.Data.CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?"
         val selectionArgs = arrayOf(contactId, CommonDataKinds.Website.CONTENT_ITEM_TYPE)
 
         try {
-            context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
-                val urlIndex = cursor.getColumnIndex(CommonDataKinds.Website.URL)
+            context.contentResolver.query(uri, projection, selection, selectionArgs, null)
+                ?.use { cursor ->
+                    val urlIndex = cursor.getColumnIndex(CommonDataKinds.Website.URL)
 
-                while (cursor.moveToNext()) {
-                    val url = cursor.getString(urlIndex)
-                    if (!url.isNullOrBlank()) {
-                        websites.add(url)
+                    while (cursor.moveToNext()) {
+                        val url = cursor.getString(urlIndex)
+                        if (!url.isNullOrBlank()) {
+                            websites.add(url)
+                        }
                     }
                 }
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Error getting websites", e)
         }
@@ -552,16 +586,18 @@ class ContactRepository(
         val uri = ContactsContract.Data.CONTENT_URI
         val projection = arrayOf(CommonDataKinds.Note.NOTE)
 
-        val selection = "${ContactsContract.Data.CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?"
+        val selection =
+            "${ContactsContract.Data.CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?"
         val selectionArgs = arrayOf(contactId, CommonDataKinds.Note.CONTENT_ITEM_TYPE)
 
         try {
-            context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
-                val noteIndex = cursor.getColumnIndex(CommonDataKinds.Note.NOTE)
-                if (cursor.moveToFirst()) {
-                    return cursor.getString(noteIndex)
+            context.contentResolver.query(uri, projection, selection, selectionArgs, null)
+                ?.use { cursor ->
+                    val noteIndex = cursor.getColumnIndex(CommonDataKinds.Note.NOTE)
+                    if (cursor.moveToFirst()) {
+                        return cursor.getString(noteIndex)
+                    }
                 }
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Error getting notes", e)
         }
@@ -583,52 +619,58 @@ class ContactRepository(
             CommonDataKinds.Event.LABEL
         )
 
-        val selection = "${ContactsContract.Data.CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?"
+        val selection =
+            "${ContactsContract.Data.CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?"
         val selectionArgs = arrayOf(contactId, CommonDataKinds.Event.CONTENT_ITEM_TYPE)
 
         try {
-            context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
-                val idIndex = cursor.getColumnIndex(CommonDataKinds.Event._ID)
-                val dateIndex = cursor.getColumnIndex(CommonDataKinds.Event.START_DATE)
-                val typeIndex = cursor.getColumnIndex(CommonDataKinds.Event.TYPE)
-                val labelIndex = cursor.getColumnIndex(CommonDataKinds.Event.LABEL)
+            context.contentResolver.query(uri, projection, selection, selectionArgs, null)
+                ?.use { cursor ->
+                    val idIndex = cursor.getColumnIndex(CommonDataKinds.Event._ID)
+                    val dateIndex = cursor.getColumnIndex(CommonDataKinds.Event.START_DATE)
+                    val typeIndex = cursor.getColumnIndex(CommonDataKinds.Event.TYPE)
+                    val labelIndex = cursor.getColumnIndex(CommonDataKinds.Event.LABEL)
 
-                while (cursor.moveToNext()) {
-                    val id = cursor.getString(idIndex)
-                    val dateStr = cursor.getString(dateIndex) ?: continue
-                    val type = when (cursor.getInt(typeIndex)) {
-                        CommonDataKinds.Event.TYPE_BIRTHDAY -> EventType.BIRTHDAY
-                        CommonDataKinds.Event.TYPE_ANNIVERSARY -> EventType.ANNIVERSARY
-                        else -> EventType.OTHER
-                    }
-                    val label = cursor.getString(labelIndex)
-
-                    val date = try {
-                        val cleanDate = dateStr.removePrefix("--")
-                        val parts = cleanDate.split("-")
-                        val calendar = Calendar.getInstance()
-
-                        if (parts.size == 3) {
-                            calendar.set(parts[0].toInt(), parts[1].toInt() - 1, parts[2].toInt())
-                        } else if (parts.size == 2) {
-                            calendar.set(Calendar.MONTH, parts[0].toInt() - 1)
-                            calendar.set(Calendar.DAY_OF_MONTH, parts[1].toInt())
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getString(idIndex)
+                        val dateStr = cursor.getString(dateIndex) ?: continue
+                        val type = when (cursor.getInt(typeIndex)) {
+                            CommonDataKinds.Event.TYPE_BIRTHDAY -> EventType.BIRTHDAY
+                            CommonDataKinds.Event.TYPE_ANNIVERSARY -> EventType.ANNIVERSARY
+                            else -> EventType.OTHER
                         }
-                        calendar.timeInMillis
-                    } catch (e: Exception) {
-                        0L
-                    }
+                        val label = cursor.getString(labelIndex)
 
-                    events.add(
-                        ContactEvent(
-                            id = id,
-                            type = type,
-                            date = date,
-                            label = label
+                        val date = try {
+                            val cleanDate = dateStr.removePrefix("--")
+                            val parts = cleanDate.split("-")
+                            val calendar = Calendar.getInstance()
+
+                            if (parts.size == 3) {
+                                calendar.set(
+                                    parts[0].toInt(),
+                                    parts[1].toInt() - 1,
+                                    parts[2].toInt()
+                                )
+                            } else if (parts.size == 2) {
+                                calendar.set(Calendar.MONTH, parts[0].toInt() - 1)
+                                calendar.set(Calendar.DAY_OF_MONTH, parts[1].toInt())
+                            }
+                            calendar.timeInMillis
+                        } catch (e: Exception) {
+                            0L
+                        }
+
+                        events.add(
+                            ContactEvent(
+                                id = id,
+                                type = type,
+                                date = date,
+                                label = label
+                            )
                         )
-                    )
+                    }
                 }
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Error getting events", e)
         }
@@ -646,17 +688,22 @@ class ContactRepository(
         val selectionArgs = arrayOf(contactId)
 
         try {
-            context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    val accountType = cursor.getString(0) ?: continue
-                    return when {
-                        accountType.contains("google", ignoreCase = true) -> ContactType.GOOGLE
-                        accountType.contains("sim", ignoreCase = true) -> ContactType.SIM
-                        accountType.contains("whatsapp", ignoreCase = true) -> ContactType.WHATSAPP
-                        else -> ContactType.PHONE
+            context.contentResolver.query(uri, projection, selection, selectionArgs, null)
+                ?.use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val accountType = cursor.getString(0) ?: continue
+                        return when {
+                            accountType.contains("google", ignoreCase = true) -> ContactType.GOOGLE
+                            accountType.contains("sim", ignoreCase = true) -> ContactType.SIM
+                            accountType.contains(
+                                "whatsapp",
+                                ignoreCase = true
+                            ) -> ContactType.WHATSAPP
+
+                            else -> ContactType.PHONE
+                        }
                     }
                 }
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Error determining contact type", e)
         }
@@ -701,7 +748,10 @@ class ContactRepository(
         operations.add(
             ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                 .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-                .withValue(ContactsContract.Data.MIMETYPE, CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                .withValue(
+                    ContactsContract.Data.MIMETYPE,
+                    CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE
+                )
                 .withValue(CommonDataKinds.StructuredName.DISPLAY_NAME, displayName)
                 .build()
         )
@@ -710,7 +760,10 @@ class ContactRepository(
             operations.add(
                 ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                     .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-                    .withValue(ContactsContract.Data.MIMETYPE, CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                    .withValue(
+                        ContactsContract.Data.MIMETYPE,
+                        CommonDataKinds.Phone.CONTENT_ITEM_TYPE
+                    )
                     .withValue(CommonDataKinds.Phone.NUMBER, phoneData.number)
                     .withValue(CommonDataKinds.Phone.TYPE, phoneData.type)
                     .withValue(CommonDataKinds.Phone.LABEL, phoneData.label)
@@ -723,7 +776,10 @@ class ContactRepository(
             operations.add(
                 ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                     .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-                    .withValue(ContactsContract.Data.MIMETYPE, CommonDataKinds.Email.CONTENT_ITEM_TYPE)
+                    .withValue(
+                        ContactsContract.Data.MIMETYPE,
+                        CommonDataKinds.Email.CONTENT_ITEM_TYPE
+                    )
                     .withValue(CommonDataKinds.Email.ADDRESS, emailData.email)
                     .withValue(CommonDataKinds.Email.TYPE, emailData.type)
                     .withValue(CommonDataKinds.Email.LABEL, emailData.label)
@@ -736,7 +792,10 @@ class ContactRepository(
             operations.add(
                 ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                     .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-                    .withValue(ContactsContract.Data.MIMETYPE, CommonDataKinds.Organization.CONTENT_ITEM_TYPE)
+                    .withValue(
+                        ContactsContract.Data.MIMETYPE,
+                        CommonDataKinds.Organization.CONTENT_ITEM_TYPE
+                    )
                     .withValue(CommonDataKinds.Organization.COMPANY, it.name)
                     .withValue(CommonDataKinds.Organization.TITLE, it.title)
                     .withValue(CommonDataKinds.Organization.DEPARTMENT, it.department)
@@ -748,8 +807,14 @@ class ContactRepository(
             operations.add(
                 ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                     .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-                    .withValue(ContactsContract.Data.MIMETYPE, CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE)
-                    .withValue(CommonDataKinds.StructuredPostal.FORMATTED_ADDRESS, it.formattedAddress)
+                    .withValue(
+                        ContactsContract.Data.MIMETYPE,
+                        CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE
+                    )
+                    .withValue(
+                        CommonDataKinds.StructuredPostal.FORMATTED_ADDRESS,
+                        it.formattedAddress
+                    )
                     .withValue(CommonDataKinds.StructuredPostal.STREET, it.street)
                     .withValue(CommonDataKinds.StructuredPostal.CITY, it.city)
                     .withValue(CommonDataKinds.StructuredPostal.REGION, it.state)
@@ -764,7 +829,10 @@ class ContactRepository(
             operations.add(
                 ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                     .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-                    .withValue(ContactsContract.Data.MIMETYPE, CommonDataKinds.Note.CONTENT_ITEM_TYPE)
+                    .withValue(
+                        ContactsContract.Data.MIMETYPE,
+                        CommonDataKinds.Note.CONTENT_ITEM_TYPE
+                    )
                     .withValue(CommonDataKinds.Note.NOTE, note)
                     .build()
             )
@@ -823,7 +891,10 @@ class ContactRepository(
                 operations.add(
                     ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                         .withValue(ContactsContract.Data.RAW_CONTACT_ID, contactId)
-                        .withValue(ContactsContract.Data.MIMETYPE, CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                        .withValue(
+                            ContactsContract.Data.MIMETYPE,
+                            CommonDataKinds.Phone.CONTENT_ITEM_TYPE
+                        )
                         .withValue(CommonDataKinds.Phone.NUMBER, phoneData.number)
                         .withValue(CommonDataKinds.Phone.TYPE, phoneData.type)
                         .withValue(CommonDataKinds.Phone.LABEL, phoneData.label)
@@ -942,32 +1013,34 @@ class ContactRepository(
                 ContactsContract.Data.DISPLAY_NAME
             )
 
-            val selection = "${ContactsContract.Data.MIMETYPE} = ? AND ${CommonDataKinds.GroupMembership.GROUP_ROW_ID} = ?"
+            val selection =
+                "${ContactsContract.Data.MIMETYPE} = ? AND ${CommonDataKinds.GroupMembership.GROUP_ROW_ID} = ?"
             val selectionArgs = arrayOf(CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE, groupId)
 
             try {
-                context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
-                    val contactIdIndex = cursor.getColumnIndex(ContactsContract.Data.CONTACT_ID)
-                    val nameIndex = cursor.getColumnIndex(ContactsContract.Data.DISPLAY_NAME)
+                context.contentResolver.query(uri, projection, selection, selectionArgs, null)
+                    ?.use { cursor ->
+                        val contactIdIndex = cursor.getColumnIndex(ContactsContract.Data.CONTACT_ID)
+                        val nameIndex = cursor.getColumnIndex(ContactsContract.Data.DISPLAY_NAME)
 
-                    while (cursor.moveToNext()) {
-                        val contactId = cursor.getString(contactIdIndex) ?: continue
-                        val displayName = cursor.getString(nameIndex) ?: "Unknown"
+                        while (cursor.moveToNext()) {
+                            val contactId = cursor.getString(contactIdIndex) ?: continue
+                            val displayName = cursor.getString(nameIndex) ?: "Unknown"
 
-                        contacts.add(
-                            ContactQuickInfo(
-                                id = contactId,
-                                displayName = displayName,
-                                primaryPhoneNumber = getPrimaryPhoneNumber(contactId),
-                                primaryEmail = getPrimaryEmail(contactId),
-                                photoUri = null,
-                                contactType = determineContactType(contactId),
-                                initials = generateInitials(displayName),
-                                isStarred = false
+                            contacts.add(
+                                ContactQuickInfo(
+                                    id = contactId,
+                                    displayName = displayName,
+                                    primaryPhoneNumber = getPrimaryPhoneNumber(contactId),
+                                    primaryEmail = getPrimaryEmail(contactId),
+                                    photoUri = null,
+                                    contactType = determineContactType(contactId),
+                                    initials = generateInitials(displayName),
+                                    isStarred = false
+                                )
                             )
-                        )
+                        }
                     }
-                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting contacts by group", e)
             }
@@ -976,17 +1049,21 @@ class ContactRepository(
         }
 
     // Helper methods
-    private suspend fun getContactIdFromPhoneNumber(phoneNumber: String): String? = withContext(ioDispatcher) {
-        val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber))
-        val projection = arrayOf(ContactsContract.PhoneLookup._ID)
+    private suspend fun getContactIdFromPhoneNumber(phoneNumber: String): String? =
+        withContext(ioDispatcher) {
+            val uri = Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                Uri.encode(phoneNumber)
+            )
+            val projection = arrayOf(ContactsContract.PhoneLookup._ID)
 
-        context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                return@withContext cursor.getString(0)
+            context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    return@withContext cursor.getString(0)
+                }
             }
+            return@withContext null
         }
-        return@withContext null
-    }
 }
 
 // Paging Sources

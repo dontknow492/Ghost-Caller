@@ -68,7 +68,11 @@ class RecentContactsPagingSource(
             }
 
             val nextKey = if (contacts.size == params.loadSize) currentPage + 1 else null
-            LoadResult.Page(contacts, prevKey = if (currentPage > 0) currentPage - 1 else null, nextKey = nextKey)
+            LoadResult.Page(
+                contacts,
+                prevKey = if (currentPage > 0) currentPage - 1 else null,
+                nextKey = nextKey
+            )
         } catch (e: Exception) {
             LoadResult.Error(e)
         }

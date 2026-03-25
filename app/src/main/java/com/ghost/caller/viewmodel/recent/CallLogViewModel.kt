@@ -1,12 +1,11 @@
 @file:Suppress("D")
+
 package com.ghost.caller.viewmodel.recent
 
 import android.app.Application
 import android.icu.text.SimpleDateFormat
 import android.icu.util.Calendar
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
@@ -97,6 +96,7 @@ class CallLogViewModel(
         when (event) {
             is CallLogEvent.LoadCallLogs,
             is CallLogEvent.LoadMoreCallLogs -> Timber.d("Manual load events are handled automatically by Paging.")
+
             is CallLogEvent.SearchCallLogs -> searchCallLogs(event.query)
             is CallLogEvent.FilterByType -> filterByType(event.type)
             is CallLogEvent.FilterByDate -> filterByDate(event.dateRange)
@@ -219,8 +219,6 @@ class CallLogViewModel(
             }
         }
     }
-
-
 
 
     private fun markAsRead(callLog: CallLogEntry) {

@@ -13,9 +13,21 @@ import com.ghost.caller.repository.ContactFilter
 import com.ghost.caller.repository.ContactRepository
 import com.ghost.caller.repository.ContactSort
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.collections.find
 
 class ContactViewModel(
     application: Application,
@@ -125,7 +137,8 @@ class ContactViewModel(
 
     // Grouped contacts for alphabetical view
     private val _groupedContacts = MutableStateFlow<Map<String, List<ContactQuickInfo>>>(emptyMap())
-    val groupedContacts: StateFlow<Map<String, List<ContactQuickInfo>>> = _groupedContacts.asStateFlow()
+    val groupedContacts: StateFlow<Map<String, List<ContactQuickInfo>>> =
+        _groupedContacts.asStateFlow()
 
     // Selected contact details
     private val _selectedContact = MutableStateFlow<ContactWithDetails?>(null)
@@ -566,8 +579,4 @@ class ContactViewModel(
         }
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        // Clean up if needed
-    }
 }

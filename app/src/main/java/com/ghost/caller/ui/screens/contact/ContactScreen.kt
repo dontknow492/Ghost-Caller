@@ -1,9 +1,7 @@
 // ContactScreen.kt
 package com.ghost.caller.ui.screens.contact
 
-import android.content.Context
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,7 +17,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -30,8 +27,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.ghost.caller.models.ContactQuickInfo
-import com.ghost.caller.repository.ContactFilter
-import com.ghost.caller.repository.ContactSort
 import com.ghost.caller.ui.components.ConfirmDeleteDialog
 import com.ghost.caller.ui.components.contact.ContactTabs
 import com.ghost.caller.ui.components.contact.ContactTopBar
@@ -42,7 +37,6 @@ import com.ghost.caller.ui.components.contact.EmptyRecentView
 import com.ghost.caller.ui.components.contact.EmptySearchView
 import com.ghost.caller.ui.components.contact.GroupsList
 import com.ghost.caller.ui.screens.recent.CallLogSelectionBottomBar
-import com.ghost.caller.ui.screens.recent.CallLogSortDialog
 import com.ghost.caller.ui.screens.recent.ErrorView
 import com.ghost.caller.viewmodel.contact.ContactPagingList
 import com.ghost.caller.viewmodel.contact.ContactSideEffect
@@ -50,7 +44,6 @@ import com.ghost.caller.viewmodel.contact.ContactTab
 import com.ghost.caller.viewmodel.contact.ContactUiEvent
 import com.ghost.caller.viewmodel.contact.ContactViewModel
 import com.ghost.caller.viewmodel.contact.ViewMode
-import com.ghost.caller.viewmodel.recent.CallLogEvent
 import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -66,7 +59,6 @@ fun ContactScreen(
     viewModel: ContactViewModel
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val screenUiState by viewModel.screenUiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // Collect paginated data
@@ -76,14 +68,10 @@ fun ContactScreen(
     val searchResultsPagingItems = viewModel.searchResultsPagingFlow.collectAsLazyPagingItems()
 
     val contactGroups by viewModel.contactGroupsWithUi.collectAsStateWithLifecycle()
-    val groupedContacts by viewModel.groupedContacts.collectAsStateWithLifecycle()
-    val selectedContact by viewModel.selectedContact.collectAsStateWithLifecycle()
 
     var isSortDialogVisible by remember { mutableStateOf(false) }
     var isFilterDialogVisible by remember { mutableStateOf(false) }
-    var isDeleteDialogVisible by remember { mutableStateOf< List<String>>(emptyList()) }
-
-
+    var isDeleteDialogVisible by remember { mutableStateOf<List<String>>(emptyList()) }
 
 
     val currentItems = when (uiState.currentTab) {
@@ -142,7 +130,7 @@ fun ContactScreen(
 
                 is ContactSideEffect.ShowDeleteConfirmation -> {
                     // Show delete confirmation dialog
-                    if(effect.count > 0){
+                    if (effect.count > 0) {
                         isDeleteDialogVisible = effect.contactIds
                     }
                 }
@@ -389,7 +377,11 @@ fun ContactScreen(
                                             isSelectionMode = false,
                                             selectedContacts = emptySet(),
                                             onContactClick = { contact ->
-                                                viewModel.sendEvent(ContactUiEvent.SelectContact(contact.id))
+                                                viewModel.sendEvent(
+                                                    ContactUiEvent.SelectContact(
+                                                        contact.id
+                                                    )
+                                                )
                                             },
                                             onFavoriteClick = { contact, isStarred ->
                                                 viewModel.sendEvent(
@@ -431,7 +423,11 @@ fun ContactScreen(
                                             isSelectionMode = false,
                                             selectedContacts = emptySet(),
                                             onContactClick = { contact ->
-                                                viewModel.sendEvent(ContactUiEvent.SelectContact(contact.id))
+                                                viewModel.sendEvent(
+                                                    ContactUiEvent.SelectContact(
+                                                        contact.id
+                                                    )
+                                                )
                                             },
                                             onFavoriteClick = { contact, isStarred ->
                                                 viewModel.sendEvent(
@@ -490,7 +486,11 @@ fun ContactScreen(
                                             isSelectionMode = false,
                                             selectedContacts = emptySet(),
                                             onContactClick = { contact ->
-                                                viewModel.sendEvent(ContactUiEvent.SelectContact(contact.id))
+                                                viewModel.sendEvent(
+                                                    ContactUiEvent.SelectContact(
+                                                        contact.id
+                                                    )
+                                                )
                                             },
                                             onFavoriteClick = { contact, isStarred ->
                                                 viewModel.sendEvent(
@@ -552,7 +552,7 @@ fun ContactScreen(
             }
         )
     }
-    if(isDeleteDialogVisible.isNotEmpty()){
+    if (isDeleteDialogVisible.isNotEmpty()) {
         ConfirmDeleteDialog(
             title = "Delete Contact",
             message = "Are you sure you want to delete this contact?",

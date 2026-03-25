@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Alarm
@@ -56,7 +55,6 @@ import coil3.compose.AsyncImage
 import com.ghost.caller.presentation.call.CallViewModel
 import com.ghost.caller.viewmodel.call.CallEvent
 import kotlinx.coroutines.launch
-import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
 // Modern Dark Theme Colors
@@ -327,7 +325,8 @@ private fun TwoWaySwipeToAnswer(
                             change.consume()
                             coroutineScope.launch {
                                 // Restrict dragging within maxDrag bounds
-                                val newOffset = (offsetX.value + dragAmount).coerceIn(-maxDrag, maxDrag)
+                                val newOffset =
+                                    (offsetX.value + dragAmount).coerceIn(-maxDrag, maxDrag)
                                 offsetX.snapTo(newOffset)
                             }
                         }
