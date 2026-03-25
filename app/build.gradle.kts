@@ -4,6 +4,8 @@ import com.android.build.api.variant.FilterConfiguration
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.jetbrains.kotlin.serialization)
+
 }
 
 val isBundleBuild = gradle.startParameter.taskNames.any {
@@ -146,6 +148,13 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.jetbrains.compose.icons)
+
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+    implementation(libs.androidx.paging.runtime)
+    implementation(libs.androidx.paging.compose)
+
 
     testImplementation(libs.junit)
 
@@ -163,4 +172,18 @@ dependencies {
     // Phone number + geocoder
     implementation(libs.libphone.number)
     implementation(libs.geocoder)
+
+    implementation(libs.timber)
+    // Navigation3
+    implementation(libs.androidx.navigation3.ui)
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+    implementation(libs.androidx.material3.adaptive.navigation3)
+    implementation(libs.kotlinx.serialization.core)
+
+    // koin
+    implementation(libs.koin.core)
+    implementation(libs.koin.compose)
+    implementation(libs.koin.compose.viewModel)
+    implementation(libs.koin.android)
 }
