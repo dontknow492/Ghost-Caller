@@ -207,7 +207,7 @@ Incoming Call → Direct Call Screen (no lag)
 
 <div align="center">
 
-<a href="https://github.com/dontknow492/Ghost-Caller/assets/demo.mp4">
+<a href="[https://github.com/dontknow492/Ghost-Caller/assets/demo.mp4](https://github.com/dontknow492/Ghost-Caller/blob/master/assets/demo.mp4)">
   <img src="assets/home_dark.png" width="240" alt="Demo Video"/>
 </a>
 
