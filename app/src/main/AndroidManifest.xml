@@ -60,9 +60,17 @@
         </activity>
 
         <activity
-            android:name=".CallActivity"
-            android:exported="false"
-            android:launchMode="singleTop"/>
+            android:name=".CallerActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+
+            <!-- Allow other apps (or the system) to trigger a direct phone call through this app -->
+            <intent-filter>
+                <action android:name="android.intent.action.CALL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="tel" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".service.CallService"

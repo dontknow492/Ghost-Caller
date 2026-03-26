@@ -1,6 +1,7 @@
 package com.ghost.caller
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -24,10 +25,11 @@ class CallerActivity : ComponentActivity() {
         val allGranted = permissions.values.all { it }
         if (allGranted) {
             Timber.d("All required call permissions granted via launcher.")
-            makeCall()
+            makeCall(intent)
         } else {
             Timber.w("Required call permissions denied.")
             Toast.makeText(this, "Required permissions denied", Toast.LENGTH_SHORT).show()
+            finish() // Close the activity since we can't proceed
         }
     }
 
@@ -36,6 +38,14 @@ class CallerActivity : ComponentActivity() {
         Timber.d("CallerActivity created.")
 
         // Check and request necessary permissions
+        checkAndRequestPermissions()
+    }
+
+    // Handle new intents when launchMode is singleTop
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent) // Update the activity's intent
+        Timber.d("New intent received in CallerActivity.")
         checkAndRequestPermissions()
     }
 
@@ -62,14 +72,22 @@ class CallerActivity : ComponentActivity() {
             requestPermissionLauncher.launch(requiredPermissions)
         } else {
             Timber.d("All required call permissions already granted.")
-            makeCall()
+            makeCall(intent)
         }
     }
 
-    private fun makeCall() {
-        val number = intent.getStringExtra("number")
+    private fun makeCall(callIntent: Intent) {
+        // 1. First check for our custom string extra
+        var number = callIntent.getStringExtra("number")
+
+        // 2. If null, fallback to checking standard Android Intent data (tel: scheme)
+        if (number.isNullOrEmpty() && callIntent.data?.scheme == "tel") {
+            number = callIntent.data?.schemeSpecificPart
+        }
+
         if (number.isNullOrEmpty()) {
             Timber.e("No valid number found in intent to make call.")
+            finish() // Close the activity if we can't extract a valid number
             return
         }
 
