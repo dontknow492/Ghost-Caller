@@ -22,6 +22,8 @@ fun CallScreen(
     viewModel: CallViewModel,
     phoneNumber: String?,
     initiateCallDirectly: Boolean,
+    onRemindMe: (phoneNumber: String) -> Unit,
+    onMessage: (phoneNumber: String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     rememberCoroutineScope()
@@ -82,7 +84,9 @@ fun CallScreen(
             IncomingCallScreen(
                 number = state.phoneNumber,
                 name = state.contactName,
-                viewModel = viewModel
+                viewModel = viewModel,
+                onRemindMe = onRemindMe,
+                onMessage = onMessage
             )
         }
 

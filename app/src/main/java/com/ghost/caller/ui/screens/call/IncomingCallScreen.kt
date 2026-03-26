@@ -24,10 +24,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Message
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.CallEnd
-import androidx.compose.material.icons.rounded.Message
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -72,6 +72,8 @@ private val SliderBackground = Color(0xFF333333)
 fun IncomingCallScreen(
     number: String,
     name: String?,
+    onRemindMe: (phoneNumber: String) -> Unit,
+    onMessage: (phoneNumber: String) -> Unit,
     viewModel: CallViewModel
 ) {
     val state by viewModel.state.collectAsState()
@@ -104,8 +106,12 @@ fun IncomingCallScreen(
                     .padding(horizontal = 32.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                QuickActionButton(icon = Icons.Rounded.Alarm, label = "Remind Me") {}
-                QuickActionButton(icon = Icons.Rounded.Message, label = "Message") {}
+                QuickActionButton(icon = Icons.Rounded.Alarm, label = "Remind Me") {
+                    onRemindMe(state.phoneNumber)
+                }
+                QuickActionButton(icon = Icons.AutoMirrored.Rounded.Message, label = "Message") {
+                    onMessage(state.phoneNumber)
+                }
             }
 
             Spacer(modifier = Modifier.height(48.dp))

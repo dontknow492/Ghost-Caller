@@ -10,7 +10,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.MarqueeAnimationMode
+import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -33,6 +36,7 @@ import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -58,8 +62,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.ghost.caller.models.ContactType
 import com.ghost.caller.ui.screens.recent.CallAction
@@ -186,35 +193,42 @@ private fun CallLogItemContent(
                             fontWeight = FontWeight.SemiBold
                         ),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        // Optional: You can add basicMarquee() here too if long names get cut off!
+                        modifier = Modifier.basicMarquee(
+                            iterations = Int.MAX_VALUE,
+                            animationMode = MarqueeAnimationMode.Immediately,
+                            initialDelayMillis = 3000, // Wait 3 seconds before starting the first scroll
+                            repeatDelayMillis = 2000, // Wait 2 seconds between loops
+                            velocity = 40.dp, // Smooth, slow speed
+                            spacing = MarqueeSpacing(24.dp) // Clear gap between loops
+                        ),
                     )
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
+                    // 🔥 1. Combine all the info into a single formatted string
+                    val callTypeColor = getCallTypeColor(call)
+                    val subtitleColor = MaterialTheme.colorScheme.onSurfaceVariant
 
-                        Text(
-                            text = getCallTypeText(call),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = getCallTypeColor(call)
-                        )
-
-                        Text(
-                            text = "• ${formatDate(call.timestamp)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        if (call.durationSeconds > 0) {
-                            Text(
-                                text = "• ${formatDuration(call.durationSeconds)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
+                    val subtitleText = buildAnnotatedString {
+                        withStyle(SpanStyle(color = callTypeColor)) {
+                            append(getCallTypeText(call))
+                        }
+                        withStyle(SpanStyle(color = subtitleColor)) {
+                            append(" • ${formatDate(call.timestamp)}")
+                            if (call.durationSeconds > 0) {
+                                append(" • ${formatDuration(call.durationSeconds)}")
+                            }
                         }
                     }
+
+                    // 🔥 2. Use a single Text with basicMarquee()
+                    Text(
+                        text = subtitleText,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        // basicMarquee automatically scrolls the text horizontally ONLY if it doesn't fit!
+                        modifier = Modifier.basicMarquee()
+                    )
                 }
 
                 if (!isSelectionMode) {
@@ -225,6 +239,13 @@ private fun CallLogItemContent(
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
+                }
+
+                IconButton(onClick = { showActions = !showActions }) {
+                    Icon(
+                        Icons.Rounded.MoreVert,
+                        contentDescription = "More"
+                    )
                 }
             }
 

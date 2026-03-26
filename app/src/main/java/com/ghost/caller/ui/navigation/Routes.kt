@@ -1,6 +1,8 @@
 package com.ghost.caller.ui.navigation
 
+import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -29,11 +31,12 @@ import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import timber.log.Timber
 
+// --------------------- Navigation Keys ---------------------
+
 @Serializable
 sealed interface NavigationBarKey : NavKey {
     @Serializable
     data object RecentCall : NavigationBarKey
-
     @Serializable
     data object Contacts : NavigationBarKey
 }
@@ -44,6 +47,20 @@ data class ContactDetailKey(val contactId: String? = null, val name: String? = n
 @Serializable
 data class CallScreenKey(val phoneNumber: String?, val initiateCall: Boolean) : NavKey
 
+// --------------------- Helper Function ---------------------
+
+private fun Context.launchIntentWithToast(intent: Intent, toastMessage: String) {
+    try {
+        startActivity(intent)
+        Toast.makeText(this, toastMessage, Toast.LENGTH_SHORT).show()
+    } catch (e: Exception) {
+        Timber.e(e, "Failed to launch intent")
+        Toast.makeText(this, "Unable to perform action", Toast.LENGTH_SHORT).show()
+    }
+}
+
+// --------------------- App Navigation ---------------------
+
 @Composable
 fun AppNavigation(
     callLogViewModel: CallLogViewModel = koinViewModel(),
@@ -53,82 +70,75 @@ fun AppNavigation(
     onCloseApp: () -> Unit = {}
 ) {
     val context = LocalContext.current
-
-    // 🔥 1. Collect the Call State directly
     val callState by callViewModel.state.collectAsState()
 
-    // 🔥 2. ELIMINATE LAG: Pre-calculate the initial back stack
-    // If the app is launched for a call, we put the CallScreen directly on top BEFORE the first frame is drawn.
-    // This entirely skips the laggy animation of transitioning from RecentCall -> CallScreen on cold boot.
     val initialKeys = remember {
         val initialState = callViewModel.state.value
-        val initialNeedsCallScreen =
+        val needsCallScreen =
             launchedForCall || initialState.isCallScreenVisible || initialState.isIncomingCallScreenVisible
-
-        if (initialNeedsCallScreen) {
+        if (needsCallScreen) {
             val isInitiate = initialState.callStatus == CallStatus.Dialing
             arrayOf(
                 NavigationBarKey.RecentCall,
                 CallScreenKey(initialState.phoneNumber, isInitiate)
             )
-        } else {
-            arrayOf(NavigationBarKey.RecentCall)
-        }
+        } else arrayOf(NavigationBarKey.RecentCall)
     }
 
     val backStack = rememberNavBackStack(*initialKeys)
 
-    // 🔥 3. State-driven navigation for ongoing updates (e.g. call ends)
+    // --------------------- Reactive Call Screen Navigation ---------------------
     LaunchedEffect(callState.isCallScreenVisible, callState.isIncomingCallScreenVisible) {
         val needsCallScreen = callState.isCallScreenVisible || callState.isIncomingCallScreenVisible
-        val isCurrentlyOnCallScreen = backStack.lastOrNull() is CallScreenKey
+        val isOnCallScreen = backStack.lastOrNull() is CallScreenKey
 
-        if (needsCallScreen && !isCurrentlyOnCallScreen) {
-            // This now only runs for mid-session calls, not cold boots
+        if (needsCallScreen && !isOnCallScreen) {
             val isInitiate = callState.callStatus == CallStatus.Dialing
             backStack.add(CallScreenKey(callState.phoneNumber, isInitiate))
-        } else if (!needsCallScreen && isCurrentlyOnCallScreen) {
-            // Auto-pop when the call ends or is dismissed
-            if (launchedForCall) {
-                // If the app was closed and woke up just for the call, put it back to sleep
-                onCloseApp()
-            } else {
-                // If the app was already open, just pop the call screen to reveal what the user was looking at
-                backStack.removeLastOrNull()
-            }
+        } else if (!needsCallScreen && isOnCallScreen) {
+            if (launchedForCall) onCloseApp()
+            else backStack.removeLastOrNull()
         }
     }
 
+    // --------------------- Navigation Display ---------------------
     NavDisplay(
         backStack = backStack,
-        onBack = {
-            backStack.removeLastOrNull()
-        },
+        onBack = { backStack.removeLastOrNull() },
         entryProvider = { key ->
             when (key) {
+
                 NavigationBarKey.RecentCall -> NavEntry(key) {
                     CallLogScreen(
-                        onNavigateToCall = {
-                            backStack.add(CallScreenKey(it, true))
-                        },
+                        onNavigateToCall = { backStack.add(CallScreenKey(it, true)) },
                         onNavigateToSms = { phoneNumber ->
-                            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = "smsto:$phoneNumber".toUri()
-                            }
-                            try {
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                Timber.e(e, "Failed to launch SMS app")
-                            }
+                            context.launchIntentWithToast(
+                                Intent(Intent.ACTION_SENDTO).apply {
+                                    data = "smsto:$phoneNumber".toUri()
+                                },
+                                "Opening SMS for $phoneNumber"
+                            )
                         },
                         onNavigateToContact = { contactId ->
-                            backStack.add(ContactDetailKey(contactId))
+                            backStack.add(
+                                ContactDetailKey(
+                                    contactId
+                                )
+                            )
                         },
-                        onNavigateToAddContact = { phoneNumber, name ->
-                            backStack.add(ContactDetailKey(phoneNumber, name))
+                        onNavigateToAddContact = { phone, name ->
+                            backStack.add(
+                                ContactDetailKey(
+                                    phone,
+                                    name
+                                )
+                            )
                         },
                         navigationBar = {
-                            CallerNavigationBar(onClick = backStack::add, selected = 0)
+                            CallerNavigationBar(
+                                onClick = backStack::add,
+                                selected = 0
+                            )
                         },
                         onKeypadClick = { backStack.add(CallScreenKey(null, false)) },
                         viewModel = callLogViewModel,
@@ -137,41 +147,34 @@ fun AppNavigation(
 
                 NavigationBarKey.Contacts -> NavEntry(key) {
                     ContactScreen(
-                        onNavigateToContactDetail = { contactId ->
-                            backStack.add(ContactDetailKey(contactId))
-                        },
-                        onNavigateToAddContact = {
-                            backStack.add(ContactDetailKey())
-                        },
+                        onNavigateToContactDetail = { backStack.add(ContactDetailKey(it)) },
+                        onNavigateToAddContact = { backStack.add(ContactDetailKey()) },
                         onNavigateToEditContact = { contactId ->
                             Timber.d("Editing contact: $contactId")
                             backStack.add(ContactDetailKey(contactId))
                         },
-                        onNavigateToCall = { phoneNumber ->
-                            backStack.add(CallScreenKey(phoneNumber, true))
-                        },
-                        onNavigateToSms = { phoneNumber ->
-                            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = "smsto:$phoneNumber".toUri()
-                            }
-                            try {
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                Timber.e(e, "Failed to launch SMS app")
-                            }
+                        onNavigateToCall = { backStack.add(CallScreenKey(it, true)) },
+                        onNavigateToSms = { phone ->
+                            context.launchIntentWithToast(
+                                Intent(Intent.ACTION_SENDTO).apply {
+                                    data = "smsto:$phone".toUri()
+                                },
+                                "Opening SMS for $phone"
+                            )
                         },
                         onNavigateToEmail = { email ->
-                            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = "mailto:$email".toUri()
-                            }
-                            try {
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                Timber.e(e, "Failed to launch Email app")
-                            }
+                            context.launchIntentWithToast(
+                                Intent(Intent.ACTION_SENDTO).apply {
+                                    data = "mailto:$email".toUri()
+                                },
+                                "Opening Email for $email"
+                            )
                         },
                         navigationBar = {
-                            CallerNavigationBar(onClick = backStack::add, selected = 1)
+                            CallerNavigationBar(
+                                onClick = backStack::add,
+                                selected = 1
+                            )
                         },
                         onNavigateBack = { backStack.removeLastOrNull() },
                         viewModel = contactViewModel
@@ -180,12 +183,7 @@ fun AppNavigation(
 
                 is ContactDetailKey -> NavEntry(key) {
                     val viewModel: AddEditContactViewModel =
-                        koinViewModel(key = key.contactId) {
-                            parametersOf(
-                                key.contactId,
-                                key.name
-                            )
-                        }
+                        koinViewModel(key = key.contactId) { parametersOf(key.contactId, key.name) }
                     AddEditContactScreen(
                         onNavigateBack = { backStack.removeLastOrNull() },
                         viewModel = viewModel
@@ -197,27 +195,29 @@ fun AppNavigation(
                         onNavigateBack = { backStack.removeLastOrNull() },
                         viewModel = callViewModel,
                         phoneNumber = key.phoneNumber,
-                        initiateCallDirectly = key.initiateCall
+                        initiateCallDirectly = key.initiateCall,
+                        onMessage = { phone ->
+                            context.launchIntentWithToast(
+                                Intent(Intent.ACTION_SENDTO).apply {
+                                    data = "smsto:$phone".toUri()
+                                },
+                                "Opening message for $phone"
+                            )
+                        },
+                        onRemindMe = { phone ->
+                            context.launchIntentWithToast(
+                                Intent(Intent.ACTION_DIAL).apply { data = "tel:$phone".toUri() },
+                                "Opening reminder for $phone"
+                            )
+                        }
                     )
                 }
 
                 else -> throw IllegalArgumentException("Unknown key: $key")
             }
         },
-        transitionSpec = {
-            // Slide in from right when navigating forward
-            slideInHorizontally(initialOffsetX = { it }) togetherWith
-                    slideOutHorizontally(targetOffsetX = { -it })
-        },
-        popTransitionSpec = {
-            // Slide in from left when navigating back
-            slideInHorizontally(initialOffsetX = { -it }) togetherWith
-                    slideOutHorizontally(targetOffsetX = { it })
-        },
-        predictivePopTransitionSpec = {
-            // Slide in from left when navigating back
-            slideInHorizontally(initialOffsetX = { -it }) togetherWith
-                    slideOutHorizontally(targetOffsetX = { it })
-        },
+        transitionSpec = { slideInHorizontally { it } togetherWith slideOutHorizontally { -it } },
+        popTransitionSpec = { slideInHorizontally { -it } togetherWith slideOutHorizontally { it } },
+        predictivePopTransitionSpec = { slideInHorizontally { -it } togetherWith slideOutHorizontally { it } },
     )
 }

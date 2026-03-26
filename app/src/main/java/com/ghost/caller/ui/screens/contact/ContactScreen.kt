@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.Contacts
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -24,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
@@ -263,6 +268,7 @@ fun ContactScreen(
                                 ContactTab.CONTACTS -> {
                                     ContactListOrEmpty(
                                         pagingItems = currentItems,
+                                        emptyMessageIcon = Icons.Filled.Contacts,
                                         emptyMessage = if (uiState.searchQuery.isNotEmpty())
                                             "No contacts found for '${uiState.searchQuery}'"
                                         else
@@ -326,6 +332,7 @@ fun ContactScreen(
                                 ContactTab.FAVORITES -> {
                                     ContactListOrEmpty(
                                         pagingItems = currentItems,
+                                        emptyMessageIcon = Icons.Filled.Favorite,
                                         emptyMessage = "No favorites yet",
                                         viewMode = uiState.viewMode,
                                         onContactClick = { contact ->
@@ -342,6 +349,7 @@ fun ContactScreen(
                                         onCallClick = { phoneNumber ->
                                             viewModel.callContact(phoneNumber)
                                         },
+                                        onAddClick = { viewModel.navigateToAddContact() },
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
@@ -349,6 +357,7 @@ fun ContactScreen(
                                 ContactTab.RECENT -> {
                                     ContactListOrEmpty(
                                         pagingItems = currentItems,
+                                        emptyMessageIcon = Icons.Filled.History,
                                         emptyMessage = "No recent contacts",
                                         viewMode = uiState.viewMode,
                                         onContactClick = { contact ->
@@ -365,6 +374,7 @@ fun ContactScreen(
                                         onCallClick = { phoneNumber ->
                                             viewModel.callContact(phoneNumber)
                                         },
+                                        onAddClick = { viewModel.navigateToAddContact() },
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
@@ -391,6 +401,7 @@ fun ContactScreen(
                                 ContactTab.SEARCH -> {
                                     ContactListOrEmpty(
                                         pagingItems = currentItems,
+                                        emptyMessageIcon = Icons.Filled.BrokenImage,
                                         emptyMessage = "No results for '${uiState.searchQuery}'",
                                         viewMode = uiState.viewMode,
                                         onContactClick = { contact ->
@@ -407,6 +418,7 @@ fun ContactScreen(
                                         onCallClick = { phoneNumber ->
                                             viewModel.callContact(phoneNumber)
                                         },
+                                        onAddClick = { viewModel.navigateToAddContact() },
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
@@ -459,6 +471,7 @@ fun ContactScreen(
 @Composable
 private fun ContactListOrEmpty(
     pagingItems: LazyPagingItems<ContactQuickInfo>,
+    emptyMessageIcon: ImageVector,
     emptyMessage: String,
     viewMode: ViewMode,
     isSelectionMode: Boolean = false,
@@ -472,7 +485,11 @@ private fun ContactListOrEmpty(
 ) {
     if (pagingItems.itemCount == 0 && pagingItems.loadState.refresh !is LoadState.Loading) {
         if (onAddClick != null) {
-            EmptyContactsView(message = emptyMessage, onAddClick = onAddClick)
+            EmptyContactsView(
+                message = emptyMessage,
+                icon = emptyMessageIcon,
+                onAddClick = onAddClick
+            )
         } else {
             Text(
                 text = emptyMessage,

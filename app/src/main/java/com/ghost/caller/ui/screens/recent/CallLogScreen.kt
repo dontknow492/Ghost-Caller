@@ -2,6 +2,7 @@
 
 package com.ghost.caller.ui.screens.recent
 
+import android.icu.util.Calendar
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +40,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -86,6 +88,7 @@ import com.ghost.caller.viewmodel.recent.CallStatistics
 import com.ghost.caller.viewmodel.recent.GroupedCallLog
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 
 enum class CallAction {
     CALL, MESSAGE, INFO, DELETE, ADD_CONTACT, BLOCK, MARK_READ
@@ -581,7 +584,7 @@ fun CallLogList(
     selectedCalls: Set<String>,
     onCallClick: (CallLogEntry) -> Unit,
     onCallLongClick: (CallLogEntry) -> Unit,
-    onCallAction: (CallAction, CallLogEntry) -> Unit, // Assuming CallAction is your enum/class
+    onCallAction: (CallAction, CallLogEntry) -> Unit,
     formatDuration: (Long) -> String,
     formatDate: (Long) -> String
 ) {
@@ -601,19 +604,34 @@ fun CallLogList(
         ) { index ->
             val call = pagedCalls[index]
 
-            // 2. Handle potential nulls (if placeholders are enabled in PagingConfig)
-            if (call != null) {
-                CallLogItem(
-                    modifier = Modifier.animateItem(),
-                    call = call,
-                    isSelected = selectedCalls.contains(call.id),
-                    isSelectionMode = isSelectionMode,
-                    onClick = { onCallClick(call) },
-                    onLongClick = { onCallLongClick(call) },
-                    onCallAction = { action -> onCallAction(action, call) },
-                    formatDuration = formatDuration,
-                    formatDate = formatDate
-                )
+            // 🔥 Look at the previous call to see if the date category changed
+            val prevCall = if (index > 0) pagedCalls.peek(index - 1) else null
+
+            val currentHeader = call?.timestamp?.let { getRelativeDateHeader(it) } ?: ""
+            val prevHeader = prevCall?.timestamp?.let { getRelativeDateHeader(it) } ?: ""
+
+            Column {
+                // 📌 If it's the very first item, OR the date category changed, show the Header!
+                if (index == 0 || currentHeader != prevHeader) {
+                    if (currentHeader.isNotEmpty()) {
+                        CallLogHeaderLabel(text = currentHeader)
+                    }
+                }
+
+                // 2. Handle potential nulls (if placeholders are enabled in PagingConfig)
+                if (call != null) {
+                    CallLogItem(
+                        modifier = Modifier.animateItem(),
+                        call = call,
+                        isSelected = selectedCalls.contains(call.id),
+                        isSelectionMode = isSelectionMode,
+                        onClick = { onCallClick(call) },
+                        onLongClick = { onCallLongClick(call) },
+                        onCallAction = { action -> onCallAction(action, call) },
+                        formatDuration = formatDuration,
+                        formatDate = formatDate
+                    )
+                }
             }
         }
 
@@ -630,6 +648,64 @@ fun CallLogList(
                 }
             }
         }
+    }
+}
+
+/**
+ * Clean, standard Material 3 header label for the Call Log grouping
+ */
+@Composable
+fun CallLogHeaderLabel(text: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f))
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.width(8.dp))
+            HorizontalDivider()
+        }
+
+    }
+}
+
+/**
+ * Calculates whether a timestamp falls into "Today", "Yesterday", or an older formatted date string.
+ * It strictly zeroes out the hours/minutes/seconds so that day comparisons are 100% accurate across midnight.
+ */
+fun getRelativeDateHeader(timestamp: Long): String {
+    val now = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+
+    val callTime = Calendar.getInstance().apply {
+        timeInMillis = timestamp
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+
+    val diffMillis = now.timeInMillis - callTime.timeInMillis
+    val diffDays = TimeUnit.MILLISECONDS.toDays(diffMillis)
+
+    return when (diffDays) {
+        0L -> "Today"
+        1L -> "Yesterday"
+        // Formats older dates nicely like "Monday, October 24"
+        else -> android.text.format.DateFormat.format("EEEE, MMMM d", timestamp).toString()
     }
 }
 
