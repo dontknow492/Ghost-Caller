@@ -17,25 +17,22 @@ import com.ghost.caller.models.ContactQuickInfo
 
 // --- STATE MANAGEMENT ---
 
-
 enum class CallType {
     INCOMING, OUTGOING, MISSED, REJECTED, BLOCKED, VOICEMAIL, UNKNOWN
 }
 
-// 2. Add the new fields to your Data Class
 data class CallLogEntry(
     val id: String,
     val number: String,
     val name: String?,
     val timestamp: Long,
     val type: CallType,
-    val durationSeconds: Long,      // NEW: For call duration
-    val isRead: Boolean,            // NEW: For unread missed calls
-    val location: String?,          // NEW: "California", "New York", etc.
-    val isVideoCall: Boolean,       // NEW: Was it a video call?
-    var groupedCount: Int = 1       // NEW: To show "Jane Doe (3)"
+    val durationSeconds: Long,      // For call duration
+    val isRead: Boolean,            // For unread missed calls
+    val location: String?,          // "California", "New York", etc.
+    val isVideoCall: Boolean,       // Was it a video call?
+    var groupedCount: Int = 1       // To show "Jane Doe (3)"
 )
-
 
 fun getCallTypeText(call: CallLogEntry): String {
     return when (call.type) {
@@ -48,7 +45,6 @@ fun getCallTypeText(call: CallLogEntry): String {
         else -> "Call"
     }
 }
-
 
 @Composable
 fun getCallTypeColor(call: CallLogEntry): Color {
@@ -86,7 +82,6 @@ fun getCallTypeIcon(type: CallType): ImageVector {
         CallType.UNKNOWN -> Icons.AutoMirrored.Rounded.HelpOutline
     }
 }
-
 
 /**
  * Call UI State
@@ -150,7 +145,6 @@ enum class CallStatus {
     Missed,         // Missed call
     Rejected        // Call was rejected
 }
-
 
 enum class AudioRoute {
     EARPIECE,

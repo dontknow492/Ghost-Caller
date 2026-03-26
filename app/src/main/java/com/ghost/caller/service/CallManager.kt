@@ -4,8 +4,7 @@ import android.annotation.SuppressLint
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.InCallService
-import android.util.Log
-
+import timber.log.Timber
 
 @SuppressLint("StaticFieldLeak")
 object CallManager {
@@ -25,29 +24,28 @@ object CallManager {
     fun answerCall() {
         try {
             // Note: Depending on your exact API level, answer() might require a videoState Int parameter
-            // e.g., currentCall?.answer(VideoProfile.STATE_AUDIO_ONLY)
             currentCall?.answer(0)
-            Log.d("CallManager", "Call answered")
+            Timber.tag("CallManager").d("Call answered")
         } catch (e: Exception) {
-            Log.e("CallManager", "Failed to answer call", e)
+            Timber.tag("CallManager").e(e, "Failed to answer call")
         }
     }
 
     fun rejectCall() {
         try {
             currentCall?.reject(false, null)
-            Log.d("CallManager", "Call rejected")
+            Timber.tag("CallManager").d("Call rejected")
         } catch (e: Exception) {
-            Log.e("CallManager", "Failed to reject call", e)
+            Timber.tag("CallManager").e(e, "Failed to reject call")
         }
     }
 
     fun endCall() {
         try {
             currentCall?.disconnect()
-            Log.d("CallManager", "Call ended")
+            Timber.tag("CallManager").d("Call ended")
         } catch (e: Exception) {
-            Log.e("CallManager", "Failed to end call", e)
+            Timber.tag("CallManager").e(e, "Failed to end call")
         }
     }
 
@@ -55,9 +53,9 @@ object CallManager {
         try {
             // Muting is handled by the InCallService, not the individual Call
             callService?.setMuted(true)
-            Log.d("CallManager", "Call muted")
+            Timber.tag("CallManager").d("Call muted")
         } catch (e: Exception) {
-            Log.e("CallManager", "Failed to mute call", e)
+            Timber.tag("CallManager").e(e, "Failed to mute call")
         }
     }
 
@@ -65,27 +63,27 @@ object CallManager {
         try {
             // Unmuting is handled by the InCallService
             callService?.setMuted(false)
-            Log.d("CallManager", "Call unmuted")
+            Timber.tag("CallManager").d("Call unmuted")
         } catch (e: Exception) {
-            Log.e("CallManager", "Failed to unmute call", e)
+            Timber.tag("CallManager").e(e, "Failed to unmute call")
         }
     }
 
     fun holdCall() {
         try {
             currentCall?.hold()
-            Log.d("CallManager", "Call held")
+            Timber.tag("CallManager").d("Call held")
         } catch (e: Exception) {
-            Log.e("CallManager", "Failed to hold call", e)
+            Timber.tag("CallManager").e(e, "Failed to hold call")
         }
     }
 
     fun unHoldCall() {
         try {
             currentCall?.unhold()
-            Log.d("CallManager", "Call unheld")
+            Timber.tag("CallManager").d("Call unheld")
         } catch (e: Exception) {
-            Log.e("CallManager", "Failed to unhold call", e)
+            Timber.tag("CallManager").e(e, "Failed to unhold call")
         }
     }
 
@@ -101,10 +99,10 @@ object CallManager {
                 }
 
                 service.setAudioRoute(route)
-                Log.d("CallManager", "Speaker set to: $enabled")
+                Timber.tag("CallManager").d("Speaker set to: %b", enabled)
             }
         } catch (e: Exception) {
-            Log.e("CallManager", "Failed to set speakerphone", e)
+            Timber.tag("CallManager").e(e, "Failed to set speakerphone")
         }
     }
 }
