@@ -192,16 +192,29 @@ Incoming Call → Direct Call Screen (no lag)
 <div align="center">
 
 ### 🏠 Home Screen
-<img src="images/home_light.png" width="240"/>
-<img src="images/home_dark.png" width="240"/>
+<img src="assets/home_light.png" width="240"/>
+<img src="assets/home_dark.png" width="240"/>
 
 <br/><br/>
 
 ### 📞 Call Screen
-<img src="images/caller_light.png" width="240"/>
-<img src="images/caller_dark.png" width="240"/>
+<img src="assets/caller_light.png" width="240"/>
+<img src="assets/caller_dark.png" width="240"/>
 
 </div>
+
+
+## 🎬 Demo
+
+<div align="center">
+
+<video width="320" controls>
+  <source src="assets/demo.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+</div>
+
 
 ---
 
