@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,6 +37,16 @@ class CallerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Timber.d("CallerActivity created.")
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            window.attributes.blurBehindRadius = 80 // Adjust intensity (0 to 150)
+        } else {
+            // Fallback for older devices: Increase the background dim
+            // since true wallpaper blur isn't natively supported before API 31
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.attributes.dimAmount = 0.45f
+        }
 
         // Check and request necessary permissions
         checkAndRequestPermissions()

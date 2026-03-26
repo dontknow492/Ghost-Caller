@@ -1,14 +1,19 @@
 package com.ghost.caller.ui.screens.call
 
-
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.StartOffsetType
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -23,13 +28,17 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Message
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.CallEnd
+import androidx.compose.material.icons.rounded.KeyboardDoubleArrowLeft
+import androidx.compose.material.icons.rounded.KeyboardDoubleArrowRight
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,10 +49,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -57,16 +69,7 @@ import com.ghost.caller.viewmodel.call.CallViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-// Modern Dark Theme Colors
-private val BackgroundGradient = Brush.verticalGradient(
-    colors = listOf(
-        Color(0xFF2A2D34), // Slate dark
-        Color(0xFF121212)  // Deep black
-    )
-)
-private val AcceptGreen = Color(0xFF34C759)
-private val DeclineRed = Color(0xFFFF3B30)
-private val SliderBackground = Color(0xFF333333)
+
 
 @Composable
 fun IncomingCallScreen(
@@ -78,19 +81,48 @@ fun IncomingCallScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
+
+    val DeepBackgroundGradient = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+            MaterialTheme.colorScheme.background,
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+        ),
+    )
+
+
+
+    val PremiumRadialGradient = Brush.radialGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+            MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f),
+            Color.Transparent
+        ),
+        center = Offset(0.5f, 0.5f),
+        radius = 1.5f,
+        tileMode = TileMode.Clamp
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundGradient)
+            .background(DeepBackgroundGradient)
     ) {
+        // Premium radial gradient overlay for depth
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(PremiumRadialGradient)
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(vertical = 64.dp, horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // --- TOP: Ringing Avatar & Info ---
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(48.dp))
+
             IncomingCallHeader(
                 name = state.contactName ?: name,
                 number = state.phoneNumber.ifEmpty { number },
@@ -99,30 +131,39 @@ fun IncomingCallScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // --- MIDDLE: Quick Actions (Remind / Message) ---
+            // --- Quick Actions with Glassmorphism ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                QuickActionButton(icon = Icons.Rounded.Alarm, label = "Remind Me") {
+                QuickActionButton(
+                    icon = Icons.Rounded.Alarm,
+                    label = "Remind Me",
+                    colors = MaterialTheme.colorScheme
+                ) {
                     onRemindMe(state.phoneNumber)
                 }
-                QuickActionButton(icon = Icons.AutoMirrored.Rounded.Message, label = "Message") {
+                QuickActionButton(
+                    icon = Icons.AutoMirrored.Rounded.Message,
+                    label = "Message",
+                    colors = MaterialTheme.colorScheme
+                ) {
                     onMessage(state.phoneNumber)
                 }
             }
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // --- BOTTOM: Modern Two-Way Swipe Slider ---
+            // --- Modern Spring-physics Slider with Material colors ---
             TwoWaySwipeToAnswer(
                 onAccept = { viewModel.sendEvent(CallEvent.AcceptCall) },
-                onReject = { viewModel.sendEvent(CallEvent.RejectCall) }
+                onReject = { viewModel.sendEvent(CallEvent.RejectCall) },
+                colors = MaterialTheme.colorScheme
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
@@ -133,75 +174,29 @@ private fun IncomingCallHeader(
     number: String,
     photoUri: String?
 ) {
-    // Pulse Animation for the avatar background to indicate ringing
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulseScale"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulseAlpha"
-    )
+
+    val GlassWhite = MaterialTheme.colorScheme.surface.copy(alpha = 0.15f)
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Avatar with pulse effect
-        Box(contentAlignment = Alignment.Center) {
-            // Pulsing rings
-            Box(
-                modifier = Modifier
-                    .size(140.dp)
-                    .scale(pulseScale)
-                    .alpha(pulseAlpha)
-                    .clip(CircleShape)
-                    .background(Color.White)
-            )
 
-            // Actual Avatar
-            Surface(
-                modifier = Modifier.size(140.dp),
-                shape = CircleShape,
-                color = SliderBackground
-            ) {
-                if (photoUri != null) {
-                    AsyncImage(
-                        model = photoUri,
-                        contentDescription = "Contact Avatar",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Rounded.Person,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.5f),
-                        modifier = Modifier
-                            .padding(32.dp)
-                            .fillMaxSize()
-                    )
-                }
-            }
-        }
+        // Premium Sonar Ripple Avatar with Material colors
+        SonarRippleAvatar(
+            photoUri = photoUri,
+            colors = MaterialTheme.colorScheme
+        )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(40.dp))
 
-        // Contact Name (Large)
+        // Contact Name with Material styling
         Text(
             text = name ?: number,
-            color = Color.White,
-            fontSize = 36.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 38.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .basicMarquee()
         )
 
         // Contact Number
@@ -209,21 +204,94 @@ private fun IncomingCallHeader(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = number,
-                color = Color.White.copy(alpha = 0.7f),
-                fontSize = 20.sp
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Medium
             )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Status Text
-        Text(
-            text = "INCOMING CALL",
-            color = Color.White.copy(alpha = 0.5f),
-            fontSize = 14.sp,
-            letterSpacing = 2.sp,
-            fontWeight = FontWeight.SemiBold
-        )
+        // Status Text with Glassmorphism
+        Surface(
+            color = GlassWhite,
+            shape = RoundedCornerShape(percent = 50),
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Text(
+                text = "INCOMING CALL",
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 12.sp,
+                letterSpacing = 2.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SonarRippleAvatar(
+    photoUri: String?,
+    colors: androidx.compose.material3.ColorScheme
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "sonar")
+
+    @Composable
+    fun createPulseSpec(delay: Int): Float {
+        return infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+                initialStartOffset = StartOffset(delay, StartOffsetType.Delay)
+            ),
+            label = "pulse_$delay"
+        ).value
+    }
+
+    val pulse1 = createPulseSpec(0)
+    val pulse2 = createPulseSpec(600)
+    val pulse3 = createPulseSpec(1200)
+
+    Box(contentAlignment = Alignment.Center) {
+        // Draw the 3 expanding sonar rings with Material primary colors
+        listOf(pulse1, pulse2, pulse3).forEach { progress ->
+            Box(
+                modifier = Modifier
+                    .size(150.dp)
+                    .scale(1f + (progress * 1.5f))
+                    .alpha(1f - progress)
+                    .clip(CircleShape)
+                    .background(colors.primary.copy(alpha = 0.3f))
+            )
+        }
+
+        // Actual Avatar with Material colors
+        Surface(
+            modifier = Modifier.size(150.dp),
+            shape = CircleShape,
+            color = colors.surfaceVariant
+        ) {
+            if (photoUri != null) {
+                AsyncImage(
+                    model = photoUri,
+                    contentDescription = "Contact Avatar",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Rounded.Person,
+                    contentDescription = null,
+                    tint = colors.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp)
+                )
+            }
+        }
     }
 }
 
@@ -231,24 +299,45 @@ private fun IncomingCallHeader(
 private fun QuickActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
+    colors: androidx.compose.material3.ColorScheme,
     onClick: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(16.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = Color.White,
-            modifier = Modifier.size(28.dp)
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+        // Glassmorphism effect with blur
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            colors.surface.copy(alpha = 0.3f),
+                            colors.surface.copy(alpha = 0.1f)
+                        )
+                    )
+                )
+                .blur(0.5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = colors.primary,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = label,
-            color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Light
+            color = colors.onSurfaceVariant,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium
         )
     }
 }
@@ -256,25 +345,47 @@ private fun QuickActionButton(
 @Composable
 private fun TwoWaySwipeToAnswer(
     onAccept: () -> Unit,
-    onReject: () -> Unit
+    onReject: () -> Unit,
+    colors: androidx.compose.material3.ColorScheme
 ) {
+    // Glassmorphism effect with Material colors
+    val GlassBackground = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.2f),
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.05f)
+        )
+    )
+
+
+
     val coroutineScope = rememberCoroutineScope()
     val offsetX = remember { Animatable(0f) }
 
-    // The maximum distance the user can drag the button (left or right)
-    val maxDrag = with(LocalDensity.current) { 110.dp.toPx() }
-    // The threshold distance to trigger the action (70% of max drag)
-    val triggerThreshold = maxDrag * 0.7f
+    val maxDrag = with(LocalDensity.current) { 120.dp.toPx() }
+    val triggerThreshold = maxDrag * 0.75f
+
+    val infiniteTransition = rememberInfiniteTransition(label = "arrows")
+    val arrowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "arrowAlpha"
+    )
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(80.dp)
+            .height(86.dp)
             .clip(CircleShape)
-            .background(SliderBackground.copy(alpha = 0.6f)),
+            .background(GlassBackground)
+            .border(width = 2.dp, color = colors.primary, shape = CircleShape)
+            .blur(0.5.dp),
         contentAlignment = Alignment.Center
     ) {
-        // --- Background Icons (Decline / Accept) ---
+        // Background Track with Material colors
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -282,39 +393,65 @@ private fun TwoWaySwipeToAnswer(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left: Decline Icon (Fades out if dragging right)
-            Icon(
-                imageVector = Icons.Rounded.CallEnd,
-                contentDescription = "Decline",
-                tint = DeclineRed,
-                modifier = Modifier
-                    .size(32.dp)
-                    .alpha(1f - (offsetX.value / maxDrag).coerceIn(0f, 1f))
-            )
+            // Left Side: Decline
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.CallEnd,
+                    contentDescription = "Decline",
+                    tint = colors.error,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .alpha(1f - (offsetX.value / maxDrag).coerceIn(0f, 1f))
+                )
+                Spacer(modifier = Modifier.size(8.dp))
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardDoubleArrowLeft,
+                    contentDescription = null,
+                    tint = colors.error.copy(alpha = arrowAlpha),
+                    modifier = Modifier.alpha(1f - (offsetX.value / maxDrag).coerceIn(0f, 1f))
+                )
+            }
 
-            // Right: Accept Icon (Fades out if dragging left)
-            Icon(
-                imageVector = Icons.Rounded.Call,
-                contentDescription = "Accept",
-                tint = AcceptGreen,
-                modifier = Modifier
-                    .size(32.dp)
-                    .alpha(1f - (-offsetX.value / maxDrag).coerceIn(0f, 1f))
-            )
+            // Right Side: Accept
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardDoubleArrowRight,
+                    contentDescription = null,
+                    tint = colors.tertiary.copy(alpha = arrowAlpha),
+                    modifier = Modifier.alpha(1f - (-offsetX.value / maxDrag).coerceIn(0f, 1f))
+                )
+                Spacer(modifier = Modifier.size(8.dp))
+                Icon(
+                    imageVector = Icons.Rounded.Call,
+                    contentDescription = "Accept",
+                    tint = colors.tertiary,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .alpha(1f - (-offsetX.value / maxDrag).coerceIn(0f, 1f))
+                )
+            }
         }
 
-        // --- Center Draggable Handle ---
+        // Center Draggable Handle with Material colors
         Box(
             modifier = Modifier
                 .offset { IntOffset(offsetX.value.roundToInt(), 0) }
-                .size(64.dp)
+                .size(72.dp)
+                .border(width = 2.dp, color = colors.outlineVariant, shape = CircleShape)
                 .clip(CircleShape)
-                .background(Color.White)
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            colors.surface,
+                            colors.primaryContainer,
+                            colors.surface
+                        )
+                    )
+                )
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
                             coroutineScope.launch {
-                                // Check if dragged far enough to trigger
                                 if (offsetX.value > triggerThreshold) {
                                     offsetX.animateTo(maxDrag, tween(200))
                                     onAccept()
@@ -322,17 +459,23 @@ private fun TwoWaySwipeToAnswer(
                                     offsetX.animateTo(-maxDrag, tween(200))
                                     onReject()
                                 } else {
-                                    // Snap back to center if not dragged enough
-                                    offsetX.animateTo(0f, tween(300))
+                                    offsetX.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessLow
+                                        )
+                                    )
                                 }
                             }
                         },
                         onHorizontalDrag = { change, dragAmount ->
                             change.consume()
                             coroutineScope.launch {
-                                // Restrict dragging within maxDrag bounds
-                                val newOffset =
-                                    (offsetX.value + dragAmount).coerceIn(-maxDrag, maxDrag)
+                                val resistance =
+                                    if (Math.abs(offsetX.value) > maxDrag * 0.9f) 0.5f else 1f
+                                val newOffset = (offsetX.value + (dragAmount * resistance))
+                                    .coerceIn(-maxDrag, maxDrag)
                                 offsetX.snapTo(newOffset)
                             }
                         }
@@ -340,15 +483,14 @@ private fun TwoWaySwipeToAnswer(
                 },
             contentAlignment = Alignment.Center
         ) {
-            // Change the handle icon color dynamically based on drag direction
             val handleIconTint = when {
-                offsetX.value > 20f -> AcceptGreen
-                offsetX.value < -20f -> DeclineRed
-                else -> Color.DarkGray
+                offsetX.value > 30f -> colors.tertiary
+                offsetX.value < -30f -> colors.error
+                else -> colors.onSurface
             }
 
             val handleIcon = when {
-                offsetX.value < -20f -> Icons.Rounded.CallEnd
+                offsetX.value < -30f -> Icons.Rounded.CallEnd
                 else -> Icons.Rounded.Call
             }
 
@@ -356,7 +498,7 @@ private fun TwoWaySwipeToAnswer(
                 imageVector = handleIcon,
                 contentDescription = "Drag to answer or decline",
                 tint = handleIconTint,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(36.dp)
             )
         }
     }

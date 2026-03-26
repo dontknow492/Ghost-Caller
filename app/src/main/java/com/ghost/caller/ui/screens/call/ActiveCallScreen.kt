@@ -2,8 +2,19 @@
 
 package com.ghost.caller.ui.screens.call
 
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -14,9 +25,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.NoteAdd
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
@@ -32,6 +46,7 @@ import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -43,9 +58,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -56,17 +75,6 @@ import com.ghost.caller.viewmodel.call.CallEvent
 import com.ghost.caller.viewmodel.call.CallStatus
 import com.ghost.caller.viewmodel.call.CallViewModel
 
-// Modern Dark Theme Colors for the Call Screen
-private val BackgroundGradient = Brush.verticalGradient(
-    colors = listOf(
-        Color(0xFF2A2D34), // Slate dark
-        Color(0xFF121212)  // Deep black
-    )
-)
-private val ButtonDarkGray = Color(0xFF333333)
-private val ButtonActiveWhite = Color(0xFFE0E0E0)
-private val EndCallRed = Color(0xFFFF3B30)
-
 @Composable
 fun ActiveCallScreen(
     number: String,
@@ -74,22 +82,48 @@ fun ActiveCallScreen(
     viewModel: CallViewModel
 ) {
     val state by viewModel.state.collectAsState()
-
     var showDialpad by remember { mutableStateOf(false) }
 
-    // Main Container with modern static gradient background
+    // Dynamic gradient with Glassmorphism effect
+    val dynamicBackgroundGradient = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+            MaterialTheme.colorScheme.background,
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+        )
+    )
+
+    // Premium radial gradient overlay for depth
+    val premiumRadialGradient = Brush.radialGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+            MaterialTheme.colorScheme.secondary.copy(alpha = 0.04f),
+            Color.Transparent
+        ),
+        center = Offset(0.5f, 0.5f),
+        radius = 1.5f,
+        tileMode = TileMode.Clamp
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundGradient)
+            .background(dynamicBackgroundGradient)
     ) {
+        // Premium radial gradient overlay for depth
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(premiumRadialGradient)
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(vertical = 48.dp, horizontal = 24.dp),
+                .padding(vertical = 56.dp, horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // --- TOP HEADER: Avatar, Name, Number, Status ---
+            // --- TOP HEADER: Avatar, Name, Status Pill ---
             CallHeader(
                 name = state.contactName ?: name,
                 number = state.phoneNumber.ifEmpty { number },
@@ -101,12 +135,14 @@ fun ActiveCallScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             // --- MIDDLE SECTION: Controls Grid OR Dialpad ---
-            Crossfade(
+            AnimatedContent(
                 targetState = showDialpad,
-//                animationSpec = tween(300),
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                },
                 label = "ControlsVsDialpad"
-            ) { showDialpad ->
-                if (showDialpad) {
+            ) { isDialpad ->
+                if (isDialpad) {
                     InCallDialpad(
                         onDigitClick = { viewModel.sendEvent(CallEvent.AppendDigit(it)) }
                     )
@@ -118,7 +154,7 @@ fun ActiveCallScreen(
                         onMuteToggle = { viewModel.sendEvent(CallEvent.ToggleMute) },
                         onHoldToggle = { viewModel.sendEvent(CallEvent.ToggleHold) },
                         onRecordToggle = { viewModel.sendEvent(CallEvent.ToggleRecording) },
-                        onVideoClick = { /* Handle Video (Disabled/Future) */ },
+                        onVideoClick = { /* Handle Video */ },
                         onNoteClick = { /* Handle Note */ },
                         onAddCallClick = { /* Handle Add Call */ }
                     )
@@ -132,9 +168,7 @@ fun ActiveCallScreen(
                 isSpeakerOn = state.isSpeakerOn,
                 isDialpadOpen = showDialpad,
                 onSpeakerToggle = { viewModel.sendEvent(CallEvent.ToggleSpeaker) },
-                onDialpadToggle = {
-                    showDialpad = !showDialpad
-                },
+                onDialpadToggle = { showDialpad = !showDialpad },
                 onEndCall = { viewModel.sendEvent(CallEvent.EndCall) }
             )
         }
@@ -149,43 +183,76 @@ private fun CallHeader(
     duration: String,
     photoUri: String?
 ) {
+    // Glassmorphism effect for status pill
+    val glassBackground = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.1f)
+        )
+    )
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Avatar
-        Surface(
-            modifier = Modifier.size(100.dp),
-            shape = CircleShape,
-            color = ButtonDarkGray
+        // Avatar with premium gradient border
+        Box(
+            modifier = Modifier.size(110.dp),
+            contentAlignment = Alignment.Center
         ) {
-            if (photoUri != null) {
-                // If you have Coil installed, this loads the contact image
-                AsyncImage(
-                    model = photoUri,
-                    contentDescription = "Contact Avatar",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                // Fallback icon
-                Icon(
-                    imageVector = Icons.Rounded.Person,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.5f),
-                    modifier = Modifier
-                        .padding(24.dp)
-                        .fillMaxSize()
-                )
+            // Premium gradient border
+            Box(
+                modifier = Modifier
+                    .size(114.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.sweepGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.secondary,
+                                MaterialTheme.colorScheme.tertiary,
+                                MaterialTheme.colorScheme.primary
+                            )
+                        )
+                    )
+            )
+
+            Surface(
+                modifier = Modifier.size(110.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                shadowElevation = 8.dp
+            ) {
+                if (photoUri != null) {
+                    AsyncImage(
+                        model = photoUri,
+                        contentDescription = "Contact Avatar",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Rounded.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp)
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Name (Large)
+        // Name with gradient text effect
         Text(
             text = name ?: number,
-            color = Color.White,
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1
+            fontSize = 34.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            modifier = Modifier.basicMarquee(),
+            style = MaterialTheme.typography.headlineMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
         )
 
         // Number (Only show if we already showed the name above)
@@ -193,28 +260,63 @@ private fun CallHeader(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = number,
-                color = Color.White.copy(alpha = 0.7f),
-                fontSize = 18.sp
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // Status or Duration
-        val statusText = when (status) {
-            CallStatus.Active -> duration
-            CallStatus.Dialing -> "DIALING..."
-            CallStatus.Connecting -> "CONNECTING..."
-            CallStatus.OnHold -> "ON HOLD"
-            else -> status.name.uppercase()
+        // Status or Duration Glass Pill with blur effect
+        Surface(
+            modifier = Modifier.blur(0.5.dp),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+            shape = RoundedCornerShape(percent = 50)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                // Pulsing Primary Dot for Active calls
+                if (status == CallStatus.Active) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                    val alpha by infiniteTransition.animateFloat(
+                        initialValue = 0.3f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = LinearEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "dotPulse"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+
+                val statusText = when (status) {
+                    CallStatus.Active -> duration
+                    CallStatus.Dialing -> "DIALING..."
+                    CallStatus.Connecting -> "CONNECTING..."
+                    CallStatus.OnHold -> "ON HOLD"
+                    else -> status.name.uppercase()
+                }
+
+                Text(
+                    text = statusText,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 14.sp,
+                    letterSpacing = 1.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
-
-        Text(
-            text = statusText,
-            color = if (status == CallStatus.Active) Color.White else Color.White.copy(alpha = 0.5f),
-            fontSize = 16.sp,
-            letterSpacing = 1.sp
-        )
     }
 }
 
@@ -241,8 +343,8 @@ private fun CallControlsGrid(
         ) {
             CallControlButton(
                 icon = Icons.Rounded.Videocam,
-                label = "Video call",
-                isActive = false, // Usually disabled until implemented
+                label = "Video",
+                isActive = false,
                 enabled = false,
                 onClick = onVideoClick
             )
@@ -280,7 +382,7 @@ private fun CallControlsGrid(
             )
             CallControlButton(
                 icon = Icons.Rounded.PersonAdd,
-                label = "Add call",
+                label = "Add",
                 isActive = false,
                 enabled = false,
                 onClick = onAddCallClick
@@ -304,27 +406,34 @@ private fun BottomCallBar(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Speaker Toggle
+        // Speaker Toggle with Glassmorphism
         CallControlButton(
             icon = if (isSpeakerOn) Icons.AutoMirrored.Rounded.VolumeUp else Icons.AutoMirrored.Rounded.VolumeOff,
-            label = null, // No label on bottom row
+            label = null,
             isActive = isSpeakerOn,
             onClick = onSpeakerToggle
         )
 
-        // End Call (Large Red Button)
+        // End Call with Premium Gradient
         Box(
             modifier = Modifier
-                .size(76.dp)
+                .size(80.dp)
                 .clip(CircleShape)
-                .background(EndCallRed)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.error,
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                        )
+                    )
+                )
                 .clickable { onEndCall() },
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Rounded.CallEnd,
                 contentDescription = "End Call",
-                tint = Color.White,
+                tint = MaterialTheme.colorScheme.onError,
                 modifier = Modifier.size(36.dp)
             )
         }
@@ -347,31 +456,49 @@ private fun CallControlButton(
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
-    val backgroundColor = when {
-        !enabled -> ButtonDarkGray.copy(alpha = 0.5f)
-        isActive -> ButtonActiveWhite
-        else -> ButtonDarkGray
-    }
+    // Glassmorphism gradient for background
+    val glassGradient = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.1f)
+        )
+    )
 
-    val iconTint = when {
-        !enabled -> Color.Gray
-        isActive -> Color.Black
-        else -> Color.White
-    }
+    // Smooth transition animations adapting to Material Theme colors
+    val backgroundColor by animateColorAsState(
+        targetValue = when {
+            !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+            isActive -> MaterialTheme.colorScheme.primaryContainer
+            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+        },
+        label = "btnBgColor"
+    )
+
+    val iconTint by animateColorAsState(
+        targetValue = when {
+            !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+            isActive -> MaterialTheme.colorScheme.onPrimaryContainer
+            else -> MaterialTheme.colorScheme.onSurface
+        },
+        label = "btnIconTint"
+    )
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(8.dp)
+        modifier = Modifier.padding(4.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(64.dp)
+                .size(72.dp)
                 .clip(CircleShape)
                 .background(backgroundColor)
+                .then(
+                    if (isActive) Modifier.blur(0.5.dp) else Modifier
+                )
                 .clickable(
                     enabled = enabled,
                     onClick = onClick,
-                    indication = ripple(bounded = true, radius = 24.dp),
+                    indication = ripple(bounded = true, radius = 36.dp),
                     interactionSource = remember { MutableInteractionSource() }
                 ),
             contentAlignment = Alignment.Center
@@ -388,8 +515,10 @@ private fun CallControlButton(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = label,
-                color = if (enabled) Color.White else Color.Gray,
-                fontSize = 14.sp
+                color = if (enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
             )
         }
     }
@@ -406,7 +535,8 @@ private fun InCallDialpad(onDigitClick: (String) -> Unit) {
 
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(horizontal = 16.dp)
     ) {
         for (row in keys) {
             Row(
@@ -427,32 +557,46 @@ private fun InCallDialpad(onDigitClick: (String) -> Unit) {
 
 @Composable
 private fun DialpadKey(number: String, letters: String, onClick: () -> Unit) {
+    // Glassmorphism effect for dialpad keys
+    val glassBackground = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.25f),
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.1f)
+        )
+    )
+
     Box(
         modifier = Modifier
             .size(76.dp)
             .clip(CircleShape)
-            .background(ButtonDarkGray)
-            .clickable { onClick() },
+            .background(glassBackground)
+            .blur(0.5.dp)
+            .clickable(
+                onClick = onClick,
+                indication = ripple(bounded = true, color = MaterialTheme.colorScheme.onSurface),
+                interactionSource = remember { MutableInteractionSource() }
+            ),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.offset(y = if (letters.isNotEmpty()) (-2).dp else 0.dp)
+        ) {
             Text(
                 text = number,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Light
             )
             if (letters.isNotEmpty()) {
                 Text(
                     text = letters,
-                    color = Color.White.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 10.sp,
-                    letterSpacing = 1.sp
+                    letterSpacing = 1.5.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
     }
 }
-
-
-

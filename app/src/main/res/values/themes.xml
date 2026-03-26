@@ -3,22 +3,22 @@
 
 
     <style name="Theme.Caller" parent="android:Theme.Material.Light.NoActionBar">
-        <!--        <item name="android:windowBackground">@android:color/transparent</item>-->
-        <!--        <item name="android:windowIsTranslucent">true</item>-->
-        <!--        <item name="android:windowContentOverlay">@null</item>-->
-        <!--        <item name="android:windowShowWallpaper">true</item>-->
-        <!--        <item name="android:windowDrawsSystemBarBackgrounds">true</item>-->
-        <!--        <item name="android:statusBarColor">@android:color/transparent</item>-->
-        <!--        <item name="android:navigationBarColor">@android:color/transparent</item>-->
+                <item name="android:windowBackground">@android:color/transparent</item>
+                <item name="android:windowIsTranslucent">true</item>
+                <item name="android:windowContentOverlay">@null</item>
+                <item name="android:windowShowWallpaper">true</item>
+                <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+                <item name="android:statusBarColor">@android:color/transparent</item>
+                <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
     <style name="Theme.CallingApp.Translucent" parent="Theme.Caller">
-        <!--        <item name="android:windowIsTranslucent">true</item>-->
-        <!--        <item name="android:windowContentOverlay">@null</item>-->
-        <!--        <item name="android:backgroundDimEnabled">true</item>-->
-        <!--        <item name="android:windowShowWallpaper">true</item>-->
-        <!--        <item name="android:windowBackground">@android:color/transparent</item>-->
-        <!--        <item name="android:colorBackgroundCacheHint">@null</item>-->
+                <item name="android:windowIsTranslucent">true</item>
+                <item name="android:windowContentOverlay">@null</item>
+                <item name="android:backgroundDimEnabled">true</item>
+                <item name="android:windowShowWallpaper">true</item>
+                <item name="android:windowBackground">@android:color/transparent</item>
+                <item name="android:colorBackgroundCacheHint">@null</item>
     </style>
 
 
