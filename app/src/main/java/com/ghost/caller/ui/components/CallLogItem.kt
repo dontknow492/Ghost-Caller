@@ -53,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -157,6 +158,11 @@ private fun CallLogItemContent(
     var showActions by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
 
+    val title = rememberSaveable(call.name, call.number) {
+        if(call.name.isNullOrEmpty() or call.name.isNullOrBlank()) call.number
+        else call.name ?: "Unknown"
+    }
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -188,7 +194,7 @@ private fun CallLogItemContent(
                 Column(modifier = Modifier.weight(1f)) {
 
                     Text(
-                        text = call.name ?: call.number,
+                        text = title,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.SemiBold
                         ),

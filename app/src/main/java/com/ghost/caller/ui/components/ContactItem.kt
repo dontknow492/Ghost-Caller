@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +57,11 @@ fun ContactListItem(
     onCallClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+
+    val displayName = rememberSaveable(contact.displayName, contact.primaryPhoneNumber) {
+        if(contact.displayName.isEmpty() or contact.displayName.isBlank() && contact.primaryPhoneNumber != null) contact.primaryPhoneNumber
+        else contact.displayName
+    }
 
     Surface(
         modifier = modifier
@@ -105,7 +111,7 @@ fun ContactListItem(
                 Row(verticalAlignment = Alignment.CenterVertically) {
 
                     Text(
-                        text = contact.displayName,
+                        text = displayName,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
