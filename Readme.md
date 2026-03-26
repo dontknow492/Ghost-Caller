@@ -203,17 +203,17 @@ Incoming Call → Direct Call Screen (no lag)
 
 </div>
 
-
 ## 🎬 Demo
 
 <div align="center">
 
-<video width="320" controls>
-  <source src="assets/demo.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+<a href="https://github.com/dontknow492/Ghost-Caller/assets/demo.mp4">
+  <img src="assets/home_dark.png" width="240" alt="Demo Video"/>
+</a>
 
 </div>
+
+
 
 
 ---
