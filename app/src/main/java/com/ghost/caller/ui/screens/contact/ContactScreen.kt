@@ -1,7 +1,5 @@
-// ContactScreen.kt
 package com.ghost.caller.ui.screens.contact
 
-import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +12,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -40,23 +40,24 @@ import com.ghost.caller.viewmodel.contact.ContactTab
 import com.ghost.caller.viewmodel.contact.ContactUiEvent
 import com.ghost.caller.viewmodel.contact.ContactViewModel
 import com.ghost.caller.viewmodel.contact.ViewMode
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ContactScreen(
-    onNavigateToContactDetail: (String) -> Unit,
+    onNavigateToContactDetail: (contactId: String) -> Unit,
     onNavigateToAddContact: () -> Unit,
     onNavigateToEditContact: (String) -> Unit,
     onNavigateToCall: (String) -> Unit,
     onNavigateToSms: (String) -> Unit,
     onNavigateToEmail: (String) -> Unit,
+    onNavigateBack: () -> Unit,
     navigationBar: (@Composable () -> Unit)?,
     viewModel: ContactViewModel
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-
+    LocalContext.current
 
     val contactGroups by viewModel.contactGroupsWithUi.collectAsStateWithLifecycle()
 
@@ -64,63 +65,74 @@ fun ContactScreen(
     var isFilterDialogVisible by remember { mutableStateOf(false) }
     var isDeleteDialogVisible by remember { mutableStateOf<List<String>>(emptyList()) }
 
+    // Snackbar host state for displaying messages instead of Toasts
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val currentItems: LazyPagingItems<ContactQuickInfo> = when (uiState.currentTab) {
         ContactTab.CONTACTS -> viewModel.contactsPagingFlow.collectAsLazyPagingItems()
         ContactTab.FAVORITES -> viewModel.favoritesPagingFlow.collectAsLazyPagingItems()
         ContactTab.RECENT -> viewModel.recentContactsPagingFlow.collectAsLazyPagingItems()
         ContactTab.SEARCH -> viewModel.searchResultsPagingFlow.collectAsLazyPagingItems()
-        ContactTab.GROUPS -> viewModel.contactsPagingFlow.collectAsLazyPagingItems()
+        ContactTab.GROUPS -> viewModel.contactsPagingFlow.collectAsLazyPagingItems() // Fallback, handled uniquely below
     }
-
 
     // Handle side effects
     LaunchedEffect(Unit) {
-        viewModel.sideEffect.collectLatest { effect ->
+        // Use 'collect' instead of 'collectLatest' so we don't drop quick sequential side effects
+        viewModel.sideEffect.collect { effect ->
             when (effect) {
                 is ContactSideEffect.NavigateToContactDetail -> {
+                    Timber.d("SideEffect: NavigateToContactDetail (id: ${effect.contactId})")
                     onNavigateToContactDetail(effect.contactId)
                 }
 
                 is ContactSideEffect.NavigateToAddContact -> {
+                    Timber.d("SideEffect: NavigateToAddContact")
                     onNavigateToAddContact()
                 }
 
                 is ContactSideEffect.NavigateToEditContact -> {
+                    Timber.d("SideEffect: NavigateToEditContact (id: ${effect.contactId})")
                     onNavigateToEditContact(effect.contactId)
                 }
 
                 is ContactSideEffect.NavigateToCall -> {
+                    Timber.d("SideEffect: NavigateToCall (number: ${effect.phoneNumber})")
                     onNavigateToCall(effect.phoneNumber)
                 }
 
                 is ContactSideEffect.NavigateToSms -> {
+                    Timber.d("SideEffect: NavigateToSms (number: ${effect.phoneNumber})")
                     onNavigateToSms(effect.phoneNumber)
                 }
 
                 is ContactSideEffect.NavigateToEmail -> {
+                    Timber.d("SideEffect: NavigateToEmail (email: ${effect.email})")
                     onNavigateToEmail(effect.email)
                 }
 
                 is ContactSideEffect.NavigateToGroupContacts -> {
-                    // Navigate to group contacts view
+                    Timber.d("SideEffect: NavigateToGroupContacts (groupId: ${effect.groupId})")
                     onNavigateToContactDetail(effect.groupId)
                 }
 
                 is ContactSideEffect.ShowToast -> {
-                    Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
+                    Timber.d("SideEffect: ShowToast - ${effect.message}")
+                    launch { snackbarHostState.showSnackbar(effect.message) }
                 }
 
                 is ContactSideEffect.ShowError -> {
-                    Toast.makeText(context, effect.message, Toast.LENGTH_LONG).show()
+                    Timber.e("SideEffect: ShowError - ${effect.message}")
+                    launch { snackbarHostState.showSnackbar(effect.message) }
                 }
 
                 is ContactSideEffect.ShowSuccess -> {
-                    Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
+                    Timber.d("SideEffect: ShowSuccess - ${effect.message}")
+                    launch { snackbarHostState.showSnackbar(effect.message) }
                 }
 
                 is ContactSideEffect.ShowDeleteConfirmation -> {
-                    // Show delete confirmation dialog
+                    Timber.d("SideEffect: ShowDeleteConfirmation (${effect.count} items)")
                     if (effect.count > 0) {
                         isDeleteDialogVisible = effect.contactIds
                     }
@@ -131,22 +143,27 @@ fun ContactScreen(
                 is ContactSideEffect.ContactAdded,
                 is ContactSideEffect.ContactUpdated,
                 is ContactSideEffect.ContactStarredToggled -> {
-                    // Handled by UI state updates
+                    Timber.d("SideEffect: Data mutation occurred, refreshing list")
+                    currentItems.refresh()
                 }
 
                 is ContactSideEffect.NavigateBack -> {
-                    // Handle navigation back if needed
+                    Timber.d("SideEffect: NavigateBack")
+                    onNavigateBack()
                 }
             }
         }
     }
 
-
     PullToRefreshBox(
         isRefreshing = currentItems.loadState.refresh is LoadState.Loading,
-        onRefresh = { currentItems.refresh() },
+        onRefresh = {
+            Timber.d("User triggered manual refresh")
+            currentItems.refresh()
+        },
     ) {
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 ContactTopBar(
                     searchQuery = uiState.searchQuery,
@@ -158,19 +175,18 @@ fun ContactScreen(
                         }
                     },
                     onSortClick = {
-                        // Show sort options menu
+                        Timber.d("Sort dialog opened")
                         isSortDialogVisible = true
                     },
                     onFilterClick = {
-                        // Show filter options menu
+                        Timber.d("Filter dialog opened")
                         isFilterDialogVisible = true
                     },
                     onViewModeToggle = {
-                        viewModel.sendEvent(
-                            ContactUiEvent.ChangeViewMode(
-                                if (uiState.viewMode == ViewMode.LIST) ViewMode.GRID else ViewMode.LIST
-                            )
-                        )
+                        val newMode =
+                            if (uiState.viewMode == ViewMode.LIST) ViewMode.GRID else ViewMode.LIST
+                        Timber.d("Toggled view mode to $newMode")
+                        viewModel.sendEvent(ContactUiEvent.ChangeViewMode(newMode))
                     },
                     currentViewMode = uiState.viewMode
                 )
@@ -180,12 +196,15 @@ fun ContactScreen(
                     CallLogSelectionBottomBar(
                         selectedCount = uiState.selectedContacts.size,
                         onCancel = {
+                            Timber.d("Selection mode cancelled")
                             viewModel.sendEvent(ContactUiEvent.ToggleSelectionMode(false))
                         },
                         onDelete = {
+                            Timber.d("Delete clicked in selection mode")
                             viewModel.showDeleteConfirmation()
                         },
                         onSelectAll = {
+                            Timber.d("Select all clicked in selection mode")
                             viewModel.sendEvent(ContactUiEvent.SelectAllContacts)
                         }
                     )
@@ -196,7 +215,10 @@ fun ContactScreen(
             floatingActionButton = {
                 if (!uiState.isSelectionMode) {
                     FloatingActionButton(
-                        onClick = { viewModel.navigateToAddContact() }
+                        onClick = {
+                            Timber.d("FAB clicked to add new contact")
+                            viewModel.navigateToAddContact()
+                        }
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "Add Contact")
                     }
@@ -221,7 +243,10 @@ fun ContactScreen(
                     uiState.error != null && currentItems.itemCount == 0 -> {
                         ErrorView(
                             message = uiState.error ?: "Failed to load contacts",
-                            onRetry = { viewModel.sendEvent(ContactUiEvent.Retry) }
+                            onRetry = {
+                                Timber.d("Retry clicked after error")
+                                viewModel.sendEvent(ContactUiEvent.Retry)
+                            }
                         )
                     }
 
@@ -229,11 +254,8 @@ fun ContactScreen(
                         ContactTabs(
                             currentTab = uiState.currentTab,
                             onTabSelected = { tab ->
-                                viewModel.sendEvent(
-                                    ContactUiEvent.ChangeTab(
-                                        tab
-                                    )
-                                )
+                                Timber.d("Tab changed to $tab")
+                                viewModel.sendEvent(ContactUiEvent.ChangeTab(tab))
                             },
                             modifier = Modifier.fillMaxSize()
                         ) {
@@ -270,6 +292,7 @@ fun ContactScreen(
                                         },
                                         onContactLongClick = { contact ->
                                             if (!uiState.isSelectionMode) {
+                                                Timber.d("Long click on contact (id: ${contact.id}), entering selection mode")
                                                 viewModel.sendEvent(
                                                     ContactUiEvent.ToggleSelectionMode(
                                                         true
@@ -283,6 +306,7 @@ fun ContactScreen(
                                             }
                                         },
                                         onFavoriteClick = { contact, isStarred ->
+                                            Timber.d("Favorite toggled for contact (id: ${contact.id}), new state: ${!isStarred}")
                                             viewModel.sendEvent(
                                                 ContactUiEvent.ToggleFavorite(
                                                     contact.id,
@@ -291,6 +315,7 @@ fun ContactScreen(
                                             )
                                         },
                                         onCallClick = { phoneNumber ->
+                                            Timber.d("Quick call clicked for: $phoneNumber")
                                             viewModel.callContact(phoneNumber)
                                         },
                                         onAddClick = { viewModel.navigateToAddContact() },
@@ -304,9 +329,7 @@ fun ContactScreen(
                                         emptyMessage = "No favorites yet",
                                         viewMode = uiState.viewMode,
                                         onContactClick = { contact ->
-                                            viewModel.sendEvent(
-                                                ContactUiEvent.SelectContact(contact.id)
-                                            )
+                                            viewModel.sendEvent(ContactUiEvent.SelectContact(contact.id))
                                         },
                                         onFavoriteClick = { contact, isStarred ->
                                             viewModel.sendEvent(
@@ -317,9 +340,7 @@ fun ContactScreen(
                                             )
                                         },
                                         onCallClick = { phoneNumber ->
-                                            viewModel.callContact(
-                                                phoneNumber
-                                            )
+                                            viewModel.callContact(phoneNumber)
                                         },
                                         modifier = Modifier.fillMaxSize()
                                     )
@@ -331,9 +352,7 @@ fun ContactScreen(
                                         emptyMessage = "No recent contacts",
                                         viewMode = uiState.viewMode,
                                         onContactClick = { contact ->
-                                            viewModel.sendEvent(
-                                                ContactUiEvent.SelectContact(contact.id)
-                                            )
+                                            viewModel.sendEvent(ContactUiEvent.SelectContact(contact.id))
                                         },
                                         onFavoriteClick = { contact, isStarred ->
                                             viewModel.sendEvent(
@@ -344,9 +363,7 @@ fun ContactScreen(
                                             )
                                         },
                                         onCallClick = { phoneNumber ->
-                                            viewModel.callContact(
-                                                phoneNumber
-                                            )
+                                            viewModel.callContact(phoneNumber)
                                         },
                                         modifier = Modifier.fillMaxSize()
                                     )
@@ -359,8 +376,11 @@ fun ContactScreen(
                                         GroupsList(
                                             groups = contactGroups,
                                             onGroupClick = { group ->
+                                                Timber.d("Group clicked (id: ${group.id})")
                                                 viewModel.sendEvent(
-                                                    ContactUiEvent.LoadContactsByGroup(group.id)
+                                                    ContactUiEvent.LoadContactsByGroup(
+                                                        group.id
+                                                    )
                                                 )
                                             },
                                             modifier = Modifier.fillMaxSize()
@@ -374,9 +394,7 @@ fun ContactScreen(
                                         emptyMessage = "No results for '${uiState.searchQuery}'",
                                         viewMode = uiState.viewMode,
                                         onContactClick = { contact ->
-                                            viewModel.sendEvent(
-                                                ContactUiEvent.SelectContact(contact.id)
-                                            )
+                                            viewModel.sendEvent(ContactUiEvent.SelectContact(contact.id))
                                         },
                                         onFavoriteClick = { contact, isStarred ->
                                             viewModel.sendEvent(
@@ -387,9 +405,7 @@ fun ContactScreen(
                                             )
                                         },
                                         onCallClick = { phoneNumber ->
-                                            viewModel.callContact(
-                                                phoneNumber
-                                            )
+                                            viewModel.callContact(phoneNumber)
                                         },
                                         modifier = Modifier.fillMaxSize()
                                     )
@@ -402,42 +418,43 @@ fun ContactScreen(
         }
     }
 
-
-
-
     if (isSortDialogVisible) {
         ContactSortDialog(
             currentSort = uiState.contactSort,
             onDismiss = { isSortDialogVisible = false },
             onApply = {
                 isSortDialogVisible = false
+                Timber.d("Sort applied: $it")
                 viewModel.sendEvent(ContactUiEvent.ChangeSortOrder(it))
             }
         )
     }
+
     if (isFilterDialogVisible) {
         ContactFilterDialog(
             currentFilter = uiState.currentFilter,
             onDismiss = { isFilterDialogVisible = false },
             onApply = {
                 isFilterDialogVisible = false
+                Timber.d("Filter applied: $it")
                 viewModel.sendEvent(ContactUiEvent.ChangeFilter(it))
             }
         )
     }
+
     if (isDeleteDialogVisible.isNotEmpty()) {
         ConfirmDeleteDialog(
             title = "Delete Contact",
-            message = "Are you sure you want to delete this contact?",
+            message = "Are you sure you want to delete ${if (isDeleteDialogVisible.size > 1) "these contacts" else "this contact"}?",
             onDismiss = { isDeleteDialogVisible = emptyList() },
             onConfirm = {
+                Timber.d("Confirmed deletion of ${isDeleteDialogVisible.size} contacts")
                 viewModel.sendEvent(ContactUiEvent.DeleteContacts(isDeleteDialogVisible))
                 isDeleteDialogVisible = emptyList()
             }
         )
     }
 }
-
 
 @Composable
 private fun ContactListOrEmpty(
@@ -491,4 +508,3 @@ private fun handleContactClick(
         onNavigate(contact.id)
     }
 }
-

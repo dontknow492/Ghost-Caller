@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 class ContactViewModel(
     application: Application,
@@ -72,6 +73,7 @@ class ContactViewModel(
     @OptIn(ExperimentalCoroutinesApi::class)
     val contactsPagingFlow: Flow<PagingData<ContactQuickInfo>> = _pagingConfig
         .flatMapLatest { config ->
+            Timber.d("Fetching paginated contacts with sort: ${config.sortBy}, filter: ${config.filter}")
             contactRepository.getContactsPaged(
                 sortBy = config.sortBy,
                 filter = config.filter
@@ -87,6 +89,7 @@ class ContactViewModel(
     @OptIn(ExperimentalCoroutinesApi::class)
     val favoritesPagingFlow: Flow<PagingData<ContactQuickInfo>> = _pagingConfig
         .flatMapLatest { config ->
+            Timber.d("Fetching paginated favorites with sort: ${config.sortBy}")
             contactRepository
                 .getFavoriteContactsPaged(config.sortBy)
                 .cachedIn(viewModelScope)
@@ -101,6 +104,7 @@ class ContactViewModel(
     @OptIn(ExperimentalCoroutinesApi::class)
     val recentContactsPagingFlow: Flow<PagingData<ContactQuickInfo>> = _pagingConfig
         .flatMapLatest {
+            Timber.d("Fetching paginated recent contacts")
             contactRepository
                 .getRecentContactsPaged(
                     sortBy = it.sortBy,
@@ -130,6 +134,7 @@ class ContactViewModel(
                     return@flatMapLatest flowOf(PagingData.empty())
                 }
 
+                Timber.d("Searching contacts with query: '$query'")
                 contactRepository.searchContactsPaged(
                     query = query,
                     sortBy = config.sortBy,
@@ -167,6 +172,7 @@ class ContactViewModel(
     // ========== Initialization ==========
 
     init {
+        Timber.d("Initializing ContactViewModel")
         viewModelScope.launch {
             _event.collect { event ->
                 handleEvent(event)
@@ -218,14 +224,17 @@ class ContactViewModel(
     // ========== Tab and View Management ==========
 
     private fun changeTab(tab: ContactTab) {
+        Timber.d("Changing tab to $tab")
         _uiState.update { it.copy(currentTab = tab) }
     }
 
     private fun changeViewMode(mode: ViewMode) {
+        Timber.d("Changing view mode to $mode")
         _uiState.update { it.copy(viewMode = mode) }
     }
 
     private fun changeSortOrder(sortBy: ContactSort) {
+        Timber.d("Changing sort order to $sortBy")
         _pagingConfig.value = _pagingConfig.value.copy(sortBy = sortBy)
         _uiState.update {
             it.copy(contactSort = sortBy)
@@ -234,6 +243,7 @@ class ContactViewModel(
     }
 
     private fun changeFilter(filter: ContactFilter) {
+        Timber.d("Changing filter to $filter")
         _pagingConfig.value = _pagingConfig.value.copy(filter = filter)
         _uiState.update {
             it.copy(currentFilter = filter)
@@ -257,6 +267,7 @@ class ContactViewModel(
     }
 
     private fun clearSearch() {
+        Timber.d("Clearing search")
         _searchQuery.value = ""
         _uiState.update {
             it.copy(
@@ -270,20 +281,45 @@ class ContactViewModel(
     // ========== Contact Selection ==========
 
     private fun selectContact(contactId: String) {
+        // 🔥 FIX: Safely extract the real Contact ID from composite Paging keys (e.g., "3494-9118001025963")
+        val realId = if (contactId.contains("-")) {
+            val parts = contactId.split("-")
+            // Android Contact IDs are purely numeric. If part[0] is digits and part[1] is a long phone number, clean it!
+            if (parts[0].all { it.isDigit() } && parts.size == 2 && parts[1].length > 5) {
+                Timber.d("Extracted real Contact ID ${parts[0]} from composite key $contactId")
+                parts[0]
+            } else {
+                contactId
+            }
+        } else {
+            contactId
+        }
+
         if (_uiState.value.isSelectionMode) {
+            // We keep the composite ID for the selection list so the Compose UI doesn't glitch
             toggleContactSelection(contactId)
         } else {
-            sendSideEffect(ContactSideEffect.NavigateToContactDetail(contactId))
+            // But we MUST pass the cleaned, real ID to the detail screen!
+            sendSideEffect(ContactSideEffect.NavigateToContactDetail(realId))
         }
     }
 
     private fun loadContactDetails(contactId: String) {
         viewModelScope.launch {
+            Timber.d("Loading contact details for ID: $contactId")
             _uiState.update { it.copy(isLoading = true) }
             try {
                 val details = contactRepository.getContactDetails(contactId)
-                _selectedContact.value = details
+                if (details != null) {
+                    Timber.d("Loaded details for: ${details.contact.displayName}")
+                    _selectedContact.value = details
+                } else {
+                    Timber.w("No details found for contact ID: $contactId")
+                    _uiState.update { it.copy(error = "Contact not found") }
+                    sendSideEffect(ContactSideEffect.ShowError("Contact not found"))
+                }
             } catch (e: Exception) {
+                Timber.e(e, "Exception loading contact details for ID: $contactId")
                 _uiState.update { it.copy(error = e.message ?: "Failed to load contact details") }
                 sendSideEffect(ContactSideEffect.ShowError("Failed to load contact details"))
             } finally {
@@ -296,6 +332,7 @@ class ContactViewModel(
 
     private fun addContact(event: ContactUiEvent.AddContact) {
         viewModelScope.launch {
+            Timber.d("Adding new contact: ${event.displayName}")
             _uiState.update { it.copy(isLoading = true) }
             try {
                 val success = contactRepository.addContact(
@@ -308,14 +345,18 @@ class ContactViewModel(
                 )
 
                 if (success) {
+                    Timber.d("Successfully added contact: ${event.displayName}")
                     _uiState.update { it.copy(successMessage = "Contact added successfully") }
                     sendSideEffect(ContactSideEffect.ShowSuccess("Contact added successfully"))
                     sendSideEffect(ContactSideEffect.NavigateBack)
                     refresh()
                 } else {
-                    throw Exception("Failed to add contact")
+                    Timber.e("Failed to add contact via repository")
+                    _uiState.update { it.copy(error = "Failed to add contact") }
+                    sendSideEffect(ContactSideEffect.ShowError("Failed to add contact"))
                 }
             } catch (e: Exception) {
+                Timber.e(e, "Exception adding contact")
                 _uiState.update { it.copy(error = e.message ?: "Failed to add contact") }
                 sendSideEffect(ContactSideEffect.ShowError("Failed to add contact"))
             } finally {
@@ -326,6 +367,7 @@ class ContactViewModel(
 
     private fun updateContact(event: ContactUiEvent.UpdateContact) {
         viewModelScope.launch {
+            Timber.d("Updating contact ID: ${event.contactId}")
             _uiState.update { it.copy(isLoading = true) }
             try {
                 val success = contactRepository.updateContact(
@@ -339,14 +381,18 @@ class ContactViewModel(
                 )
 
                 if (success) {
+                    Timber.d("Successfully updated contact ID: ${event.contactId}")
                     _uiState.update { it.copy(successMessage = "Contact updated successfully") }
                     sendSideEffect(ContactSideEffect.ShowSuccess("Contact updated successfully"))
                     sendSideEffect(ContactSideEffect.NavigateBack)
                     refresh()
                 } else {
-                    throw Exception("Failed to update contact")
+                    Timber.e("Failed to update contact via repository")
+                    _uiState.update { it.copy(error = "Failed to update contact") }
+                    sendSideEffect(ContactSideEffect.ShowError("Failed to update contact"))
                 }
             } catch (e: Exception) {
+                Timber.e(e, "Exception updating contact ID: ${event.contactId}")
                 _uiState.update { it.copy(error = e.message ?: "Failed to update contact") }
                 sendSideEffect(ContactSideEffect.ShowError("Failed to update contact"))
             } finally {
@@ -357,10 +403,12 @@ class ContactViewModel(
 
     private fun deleteContact(contactId: String) {
         viewModelScope.launch {
+            Timber.d("Deleting contact ID: $contactId")
             _uiState.update { it.copy(isLoading = true) }
             try {
                 val success = contactRepository.deleteContact(contactId)
                 if (success) {
+                    Timber.d("Successfully deleted contact ID: $contactId")
                     _uiState.update { it.copy(successMessage = "Contact deleted successfully") }
                     sendSideEffect(ContactSideEffect.ShowSuccess("Contact deleted successfully"))
                     sendSideEffect(ContactSideEffect.ContactDeleted(contactId))
@@ -373,9 +421,12 @@ class ContactViewModel(
                         }
                     }
                 } else {
-                    throw Exception("Failed to delete contact")
+                    Timber.e("Failed to delete contact via repository")
+                    _uiState.update { it.copy(error = "Failed to delete contact") }
+                    sendSideEffect(ContactSideEffect.ShowError("Failed to delete contact"))
                 }
             } catch (e: Exception) {
+                Timber.e(e, "Exception deleting contact ID: $contactId")
                 _uiState.update { it.copy(error = e.message ?: "Failed to delete contact") }
                 sendSideEffect(ContactSideEffect.ShowError("Failed to delete contact"))
             } finally {
@@ -386,6 +437,7 @@ class ContactViewModel(
 
     private fun deleteContacts(contactIds: List<String>) {
         viewModelScope.launch {
+            Timber.d("Deleting ${contactIds.size} multiple contacts")
             _uiState.update { it.copy(isLoading = true) }
             try {
                 var successCount = 0
@@ -396,6 +448,7 @@ class ContactViewModel(
                 }
 
                 if (successCount > 0) {
+                    Timber.d("Successfully deleted $successCount out of ${contactIds.size} contacts")
                     _uiState.update {
                         it.copy(
                             successMessage = "$successCount contacts deleted successfully",
@@ -407,9 +460,12 @@ class ContactViewModel(
                     sendSideEffect(ContactSideEffect.ContactsDeleted(successCount))
                     refresh()
                 } else {
-                    throw Exception("Failed to delete contacts")
+                    Timber.e("Failed to delete any of the selected contacts")
+                    _uiState.update { it.copy(error = "Failed to delete contacts") }
+                    sendSideEffect(ContactSideEffect.ShowError("Failed to delete contacts"))
                 }
             } catch (e: Exception) {
+                Timber.e(e, "Exception deleting multiple contacts")
                 _uiState.update { it.copy(error = e.message ?: "Failed to delete contacts") }
                 sendSideEffect(ContactSideEffect.ShowError("Failed to delete contacts"))
             } finally {
@@ -420,6 +476,7 @@ class ContactViewModel(
 
     private fun toggleFavorite(contactId: String, isStarred: Boolean) {
         viewModelScope.launch {
+            Timber.d("Toggling favorite for contact ID: $contactId to $isStarred")
             try {
                 val success = contactRepository.setContactStarred(contactId, isStarred)
                 if (success) {
@@ -427,8 +484,11 @@ class ContactViewModel(
                     sendSideEffect(ContactSideEffect.ShowToast(message))
                     sendSideEffect(ContactSideEffect.ContactStarredToggled(contactId, isStarred))
                     refresh()
+                } else {
+                    Timber.e("Failed to toggle favorite status via repository")
                 }
             } catch (e: Exception) {
+                Timber.e(e, "Exception toggling favorite status")
                 sendSideEffect(ContactSideEffect.ShowError("Failed to update favorite status"))
             }
         }
@@ -437,6 +497,7 @@ class ContactViewModel(
     // ========== Selection Mode ==========
 
     private fun toggleSelectionMode(enabled: Boolean) {
+        Timber.d("Toggling selection mode to: $enabled")
         _uiState.update {
             it.copy(
                 isSelectionMode = enabled,
@@ -470,12 +531,14 @@ class ContactViewModel(
 
     private fun loadContactsByGroup(groupId: String) {
         viewModelScope.launch {
+            Timber.d("Loading contacts for group ID: $groupId")
             _uiState.update { it.copy(isLoading = true) }
             try {
                 val group = _contactGroups.value.find { it.id == groupId }
                 val groupName = group?.title ?: "Group"
                 sendSideEffect(ContactSideEffect.NavigateToGroupContacts(groupId, groupName))
             } catch (e: Exception) {
+                Timber.e(e, "Exception loading group contacts")
                 _uiState.update { it.copy(error = e.message ?: "Failed to load group contacts") }
                 sendSideEffect(ContactSideEffect.ShowError("Failed to load group contacts"))
             } finally {
@@ -486,11 +549,13 @@ class ContactViewModel(
 
     private fun loadContactGroups() {
         viewModelScope.launch {
+            Timber.d("Loading contact groups")
             _uiState.update { it.copy(isLoadingGroups = true) }
             try {
                 val groups = contactRepository.getContactGroups()
                 _contactGroups.value = groups
             } catch (e: Exception) {
+                Timber.e(e, "Exception loading contact groups")
                 _uiState.update { it.copy(error = e.message ?: "Failed to load contact groups") }
                 sendSideEffect(ContactSideEffect.ShowError("Failed to load contact groups"))
             } finally {
@@ -501,11 +566,13 @@ class ContactViewModel(
 
     private fun loadGroupedContacts() {
         viewModelScope.launch {
+            Timber.d("Loading grouped contacts")
             _uiState.update { it.copy(isLoading = true) }
             try {
                 val grouped = contactRepository.getContactsGrouped()
                 _groupedContacts.value = grouped
             } catch (e: Exception) {
+                Timber.e(e, "Exception loading grouped contacts")
                 _uiState.update { it.copy(error = e.message ?: "Failed to load grouped contacts") }
                 sendSideEffect(ContactSideEffect.ShowError("Failed to load grouped contacts"))
             } finally {
@@ -517,6 +584,7 @@ class ContactViewModel(
     // ========== Refresh and Retry ==========
 
     private fun refresh() {
+        Timber.d("Refreshing contacts data")
         _uiState.update { it.copy(isRefreshing = true) }
         loadContactGroups()
         loadGroupedContacts()
@@ -526,6 +594,7 @@ class ContactViewModel(
     }
 
     private fun retry() {
+        Timber.d("Retrying previous failed action")
         clearError()
         refresh()
     }

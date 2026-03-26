@@ -9,7 +9,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.ContactsContract
 import android.provider.ContactsContract.CommonDataKinds
-import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -40,6 +39,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.text.Collator
 import java.util.Calendar
 import java.util.Locale
@@ -48,7 +48,6 @@ class ContactRepository(
     private val context: Context,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
-
     companion object {
         private const val TAG = "ContactRepository"
         private const val PAGE_SIZE = 50
@@ -224,7 +223,7 @@ class ContactRepository(
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error getting grouped contacts", e)
+                Timber.tag(TAG).e(e, "Error getting grouped contacts")
             }
 
             return@withContext groupedContacts.mapValues { (_, list) ->
@@ -233,28 +232,45 @@ class ContactRepository(
         }
 
     /**
-     * Get contact details by ID
+     * Get contact details by ID or Phone Number
      */
     suspend fun getContactDetails(identifier: String): ContactWithDetails? =
         withContext(ioDispatcher) {
             if (!hasContactsPermission()) return@withContext null
 
-            val contactId =
-                if (identifier.contains("+") || identifier.any { it.isDigit() && !identifier.all { c -> c.isDigit() } }) {
-                    getContactIdFromPhoneNumber(identifier) ?: return@withContext null
-                } else {
-                    identifier
-                }
+            // 🔥 FIX: Clean identifier just in case it's a composite key (e.g., "3494-9118001025963")
+            val cleanIdentifier = if (identifier.contains("-")) {
+                val parts = identifier.split("-")
+                if (parts[0].all { it.isDigit() } && parts.size == 2) parts[0] else identifier
+            } else identifier
 
-            val contact = getContactById(contactId) ?: return@withContext null
+            // 1. Try treating it as a direct Contact ID
+            var contact = getContactById(cleanIdentifier)
+            var finalContactId = cleanIdentifier
+
+            // 2. If that fails (it wasn't an ID), try treating it as a Phone Number
+            if (contact == null && cleanIdentifier.any { it.isDigit() }) {
+                Timber.tag(TAG).d("Not found as ID, treating as phone number: $cleanIdentifier")
+                val resolvedId = getContactIdFromPhoneNumber(cleanIdentifier)
+                if (resolvedId != null) {
+                    finalContactId = resolvedId
+                    contact = getContactById(resolvedId)
+                }
+            }
+
+            // 3. If both failed, the contact doesn't exist
+            if (contact == null) {
+                Timber.tag(TAG).w("Failed to load contact info for: $cleanIdentifier")
+                return@withContext null
+            }
 
             return@withContext ContactWithDetails(
                 contact = contact,
-                organizations = getOrganizations(contactId),
-                addresses = getAddresses(contactId),
-                websites = getWebsites(contactId),
-                notes = getNotes(contactId),
-                events = getEvents(contactId)
+                organizations = getOrganizations(finalContactId),
+                addresses = getAddresses(finalContactId),
+                websites = getWebsites(finalContactId),
+                notes = getNotes(finalContactId),
+                events = getEvents(finalContactId)
             )
         }
 
@@ -340,7 +356,7 @@ class ContactRepository(
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting contact by ID", e)
+            Timber.tag(TAG).e(e, "Error getting contact by ID")
         }
 
         return@withContext null
@@ -400,7 +416,7 @@ class ContactRepository(
                     }
                 }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting phone numbers", e)
+            Timber.tag(TAG).e(e, "Error getting phone numbers")
         }
 
         return phoneNumbers
@@ -459,7 +475,7 @@ class ContactRepository(
                     }
                 }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting emails", e)
+            Timber.tag(TAG).e(e, "Error getting emails")
         }
 
         return emails
@@ -510,7 +526,7 @@ class ContactRepository(
                     }
                 }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting organizations", e)
+            Timber.tag(TAG).e(e, "Error getting organizations")
         }
 
         return organizations
@@ -581,7 +597,7 @@ class ContactRepository(
                     }
                 }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting addresses", e)
+            Timber.tag(TAG).e(e, "Error getting addresses")
         }
 
         return addresses
@@ -613,7 +629,7 @@ class ContactRepository(
                     }
                 }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting websites", e)
+            Timber.tag(TAG).e(e, "Error getting websites")
         }
 
         return websites
@@ -639,7 +655,7 @@ class ContactRepository(
                     }
                 }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting notes", e)
+            Timber.tag(TAG).e(e, "Error getting notes")
         }
 
         return null
@@ -712,7 +728,7 @@ class ContactRepository(
                     }
                 }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting events", e)
+            Timber.tag(TAG).e(e, "Error getting events")
         }
 
         return events
@@ -745,7 +761,7 @@ class ContactRepository(
                     }
                 }
         } catch (e: Exception) {
-            Log.e(TAG, "Error determining contact type", e)
+            Timber.tag(TAG).e(e, "Error determining contact type")
         }
 
         return ContactType.PHONE
@@ -884,7 +900,7 @@ class ContactRepository(
             primaryEmailCache.clear()
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error adding contact", e)
+            Timber.tag(TAG).e(e, "Error adding contact")
             false
         }
     }
@@ -950,7 +966,7 @@ class ContactRepository(
             primaryEmailCache.clear()
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error updating contact", e)
+            Timber.tag(TAG).e(e, "Error updating contact")
             false
         }
     }
@@ -971,7 +987,7 @@ class ContactRepository(
             }
             deletedRows > 0
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting contact", e)
+            Timber.tag(TAG).e(e, "Error deleting contact")
             false
         }
     }
@@ -992,7 +1008,7 @@ class ContactRepository(
             return@withContext try {
                 context.contentResolver.update(uri, values, null, null) > 0
             } catch (e: Exception) {
-                Log.e(TAG, "Error setting contact starred", e)
+                Timber.tag(TAG).e(e, "Error setting contact starred")
                 false
             }
         }
@@ -1032,7 +1048,7 @@ class ContactRepository(
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting contact groups", e)
+            Timber.tag(TAG).e(e, "Error getting contact groups")
         }
 
         return@withContext groups
@@ -1082,7 +1098,7 @@ class ContactRepository(
                         }
                     }
             } catch (e: Exception) {
-                Log.e(TAG, "Error getting contacts by group", e)
+                Timber.tag(TAG).e(e, "Error getting contacts by group")
             }
 
             return@withContext contacts

@@ -5,6 +5,7 @@ package com.ghost.caller.ui.screens.call
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -241,6 +243,7 @@ private fun CallControlsGrid(
                 icon = Icons.Rounded.Videocam,
                 label = "Video call",
                 isActive = false, // Usually disabled until implemented
+                enabled = false,
                 onClick = onVideoClick
             )
             CallControlButton(
@@ -253,6 +256,7 @@ private fun CallControlsGrid(
                 icon = Icons.AutoMirrored.Rounded.NoteAdd,
                 label = "Note",
                 isActive = false,
+                enabled = false,
                 onClick = onNoteClick
             )
         }
@@ -278,6 +282,7 @@ private fun CallControlsGrid(
                 icon = Icons.Rounded.PersonAdd,
                 label = "Add call",
                 isActive = false,
+                enabled = false,
                 onClick = onAddCallClick
             )
         }
@@ -337,10 +342,23 @@ private fun BottomCallBar(
 @Composable
 private fun CallControlButton(
     icon: ImageVector,
-    label: String?,
+    label: String? = null,
     isActive: Boolean,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
+    val backgroundColor = when {
+        !enabled -> ButtonDarkGray.copy(alpha = 0.5f)
+        isActive -> ButtonActiveWhite
+        else -> ButtonDarkGray
+    }
+
+    val iconTint = when {
+        !enabled -> Color.Gray
+        isActive -> Color.Black
+        else -> Color.White
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(8.dp)
@@ -349,22 +367,28 @@ private fun CallControlButton(
             modifier = Modifier
                 .size(64.dp)
                 .clip(CircleShape)
-                .background(if (isActive) ButtonActiveWhite else ButtonDarkGray)
-                .clickable { onClick() },
+                .background(backgroundColor)
+                .clickable(
+                    enabled = enabled,
+                    onClick = onClick,
+                    indication = ripple(bounded = true, radius = 24.dp),
+                    interactionSource = remember { MutableInteractionSource() }
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (isActive) Color.Black else Color.White,
+                tint = iconTint,
                 modifier = Modifier.size(28.dp)
             )
         }
-        if (label != null) {
+
+        if (!label.isNullOrEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = label,
-                color = Color.White,
+                color = if (enabled) Color.White else Color.Gray,
                 fontSize = 14.sp
             )
         }

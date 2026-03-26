@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.telecom.TelecomManager
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -44,6 +45,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // 🔥 Check if we were launched by the CallService to wake up the screen
+        handleCallIntent(intent)
+
         val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             listOf(
                 android.Manifest.permission.READ_CONTACTS,
@@ -67,6 +71,8 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        val launchedForCall = intent?.getBooleanExtra("from_call_service", false) == true
+
         setContent {
             CallerTheme(
                 isDarkTheme = isSystemInDarkTheme(),
@@ -74,7 +80,10 @@ class MainActivity : ComponentActivity() {
             ) {
                 PermissionsWrapper(permissions = requiredPermissions) {
                     // This ONLY shows up if all permissions are true
-                    AppNavigation()
+                    AppNavigation(
+                        launchedForCall = launchedForCall,
+                        onCloseApp = { finishAndRemoveTask() }
+                    )
                 }
             }
         }
@@ -82,6 +91,32 @@ class MainActivity : ComponentActivity() {
         requestDefaultDialerRole()
     }
 
+    // 🔥 This triggers if the app is already open in the background and CallService brings it to the front
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleCallIntent(intent)
+    }
+
+    // Handles waking up the device and breaking through the lock screen
+    private fun handleCallIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra("from_call_service", false) == true) {
+            Timber.d("Launched from CallService, attempting to wake up screen...")
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(true)
+                setTurnScreenOn(true)
+            } else {
+                @Suppress("DEPRECATION")
+                window.addFlags(
+                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                )
+            }
+            // Keep the screen on while the call UI is visible
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 
     // 3. A helper function to check if we are ALREADY the default dialer
     private fun checkIfDefaultDialer(): Boolean {

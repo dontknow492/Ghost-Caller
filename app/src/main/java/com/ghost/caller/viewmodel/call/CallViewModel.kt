@@ -440,11 +440,13 @@ class CallViewModel(
         _state.update { it.copy(isRecording = newRecordingState) }
 
         if (newRecordingState) {
-            val filePath = "${applicationContext.filesDir}/recording_${System.currentTimeMillis()}.mp3"
+            val filePath =
+                "${applicationContext.filesDir}/recording_${System.currentTimeMillis()}.mp3"
             sendSideEffect(CallSideEffect.StartRecording(filePath))
             sendSideEffect(CallSideEffect.ShowToast("Recording started"))
         } else {
-            val filePath = "${applicationContext.filesDir}/recording_${System.currentTimeMillis()}.mp3"
+            val filePath =
+                "${applicationContext.filesDir}/recording_${System.currentTimeMillis()}.mp3"
             sendSideEffect(CallSideEffect.StopRecording(filePath))
             sendSideEffect(CallSideEffect.ShowToast("Recording saved"))
         }
@@ -589,7 +591,8 @@ class CallViewModel(
                 hasPhonePermission = permissions[Manifest.permission.CALL_PHONE] ?: false,
                 hasContactsPermission = permissions[Manifest.permission.READ_CONTACTS] ?: false,
                 hasMicrophonePermission = permissions[Manifest.permission.RECORD_AUDIO] ?: false,
-                hasManageOwnCallsPermission = permissions[Manifest.permission.MANAGE_OWN_CALLS] ?: false
+                hasManageOwnCallsPermission = permissions[Manifest.permission.MANAGE_OWN_CALLS]
+                    ?: false
             )
         }
     }
@@ -752,7 +755,10 @@ class CallViewModel(
                 handlePhoneState(state)
             }
         }
-        telephonyManager.listen(legacyPhoneStateListener, android.telephony.PhoneStateListener.LISTEN_CALL_STATE)
+        telephonyManager.listen(
+            legacyPhoneStateListener,
+            android.telephony.PhoneStateListener.LISTEN_CALL_STATE
+        )
     }
 
     @Suppress("DEPRECATION")
@@ -769,6 +775,7 @@ class CallViewModel(
                     wasInCall = true
                 }
             }
+
             TelephonyManager.CALL_STATE_IDLE -> {
                 if (wasInCall) {
                     wasInCall = false

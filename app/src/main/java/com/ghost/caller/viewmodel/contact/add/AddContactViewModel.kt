@@ -2,7 +2,6 @@
 
 package com.ghost.caller.viewmodel.contact.add
 
-
 import android.app.Application
 import android.net.Uri
 import android.provider.ContactsContract
@@ -27,17 +26,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @OptIn(FlowPreview::class)
 class AddEditContactViewModel(
     application: Application,
     private val contactRepository: ContactRepository,
-    private val phoneNumber: String? = null,
+    private val contactId: String? = null,
     private val name: String? = null,
 ) : AndroidViewModel(application) {
 
     // Private mutable state flow
-    private val _state = MutableStateFlow(AddEditContactState(isEditMode = phoneNumber != null))
+    private val _state = MutableStateFlow(AddEditContactState(isEditMode = contactId != null))
     val state: StateFlow<AddEditContactState> = _state.asStateFlow()
 
     // Side effects channel
@@ -60,9 +60,9 @@ class AddEditContactViewModel(
             }
         }
 
-        // Load contact if in edit mode
-        if (phoneNumber != null) {
-            loadContact(phoneNumber)
+        // Load contact if a phone number or ID was provided
+        if (contactId != null) {
+            loadContact(contactId)
         }
 
         // Validate form on any change
@@ -141,18 +141,22 @@ class AddEditContactViewModel(
         }
     }
 
-    private fun loadContact(contactId: String) {
+    private fun loadContact(identifier: String) {
         viewModelScope.launch {
             try {
                 _state.update { it.copy(isLoading = true) }
+                Timber.d("Attempting to load contact with identifier: $identifier")
 
-                val contactDetails = contactRepository.getContactDetails(contactId)
-                contactDetails?.let { details ->
-                    val contact = details.contact
+                val contactDetails = contactRepository.getContactDetails(identifier)
+
+                if (contactDetails != null) {
+                    Timber.d("Contact details loaded successfully for: ${contactDetails.contact.displayName}")
+                    val contact = contactDetails.contact
 
                     _state.update { state ->
                         state.copy(
                             isLoading = false,
+                            isEditMode = true,
                             contactId = contact.id,
                             displayName = contact.displayName,
                             photoUri = contact.photoUri,
@@ -177,10 +181,11 @@ class AddEditContactViewModel(
                                     isNew = false
                                 )
                             },
-                            organization = details.organizations.firstOrNull()?.name ?: "",
-                            jobTitle = details.organizations.firstOrNull()?.title ?: "",
-                            department = details.organizations.firstOrNull()?.department ?: "",
-                            address = details.addresses.firstOrNull()?.let { addr ->
+                            organization = contactDetails.organizations.firstOrNull()?.name ?: "",
+                            jobTitle = contactDetails.organizations.firstOrNull()?.title ?: "",
+                            department = contactDetails.organizations.firstOrNull()?.department
+                                ?: "",
+                            address = contactDetails.addresses.firstOrNull()?.let { addr ->
                                 EditableAddress(
                                     street = addr.street ?: "",
                                     city = addr.city ?: "",
@@ -190,8 +195,8 @@ class AddEditContactViewModel(
                                     type = addr.type
                                 )
                             } ?: EditableAddress(),
-                            notes = details.notes ?: "",
-                            events = details.events.map { event ->
+                            notes = contactDetails.notes ?: "",
+                            events = contactDetails.events.map { event ->
                                 EditableEvent(
                                     id = event.id,
                                     type = event.type,
@@ -200,11 +205,30 @@ class AddEditContactViewModel(
                                     isNew = false
                                 )
                             },
-                            websites = details.websites.toMutableList()
+                            websites = contactDetails.websites.toMutableList()
+                        )
+                    }
+                } else {
+                    // Contact not found (e.g., this is a new number not in the directory)
+                    Timber.w("No contact details found for $identifier. Falling back to Add Mode.")
+                    _state.update { state ->
+                        state.copy(
+                            isLoading = false,
+                            isEditMode = false, // Switch to Add Mode
+                            displayName = name ?: "",
+                            phoneNumbers = if (identifier.any { it.isDigit() }) listOf(
+                                EditablePhoneNumber(
+                                    id = System.currentTimeMillis().toString(),
+                                    number = identifier,
+                                    isPrimary = true,
+                                    isNew = true
+                                )
+                            ) else listOf(EditablePhoneNumber())
                         )
                     }
                 }
             } catch (e: Exception) {
+                Timber.e(e, "Exception while loading contact details")
                 _state.update { it.copy(isLoading = false, error = e.message) }
                 sendSideEffect(AddEditContactSideEffect.ShowError("Failed to load contact"))
             }
@@ -652,6 +676,7 @@ class AddEditContactViewModel(
 
                 _state.update { it.copy(isLoading = false) }
             } catch (e: Exception) {
+                Timber.e(e, "Error saving contact")
                 _state.update { it.copy(isLoading = false, error = e.message) }
                 sendSideEffect(AddEditContactSideEffect.ShowError("Failed to save contact"))
             }

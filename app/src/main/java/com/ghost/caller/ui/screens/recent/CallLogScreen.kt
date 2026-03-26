@@ -185,6 +185,7 @@ fun CallLogScreen(
 
                 is CallLogSideEffect.CallLogsDeleted -> {
                     scope.launch {
+                        pagedCalls.refresh()
                         snackbarHostState.showSnackbar(
                             message = "${effect.count} calls deleted"
                         )
@@ -193,6 +194,7 @@ fun CallLogScreen(
 
                 is CallLogSideEffect.CallLogsCleared -> {
                     scope.launch {
+                        pagedCalls.refresh()
                         snackbarHostState.showSnackbar(
                             message = "Cleared ${effect.count} calls"
                         )
@@ -201,6 +203,7 @@ fun CallLogScreen(
 
                 is CallLogSideEffect.BlockNumber -> {
                     scope.launch {
+                        pagedCalls.refresh()
                         snackbarHostState.showSnackbar(
                             message = "Blocked ${effect.phoneNumber}"
                         )

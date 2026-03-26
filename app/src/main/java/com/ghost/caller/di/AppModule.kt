@@ -33,7 +33,7 @@ val viewModel = module {
         AddEditContactViewModel(
             application = get(),
             contactRepository = get(),
-            phoneNumber = contactId,
+            contactId = contactId,
             name = name
         )
     }
