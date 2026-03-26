@@ -101,7 +101,6 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditContactScreen(
-    contactId: String? = null,
     onNavigateBack: (String?) -> Unit,
     viewModel: AddEditContactViewModel,
 ) {

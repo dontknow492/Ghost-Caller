@@ -10,8 +10,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
-import com.ghost.caller.presentation.call.CallViewModel
 import com.ghost.caller.viewmodel.call.CallEvent
+import com.ghost.caller.viewmodel.call.CallViewModel
 
 class CallActivity : ComponentActivity() {
 

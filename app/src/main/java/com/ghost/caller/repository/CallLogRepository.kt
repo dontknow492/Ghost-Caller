@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import com.ghost.caller.repository.paging.CallLogPagingSource
 import com.ghost.caller.viewmodel.call.CallLogEntry
 import com.ghost.caller.viewmodel.call.CallType
 import com.ghost.caller.viewmodel.recent.CallStatistics

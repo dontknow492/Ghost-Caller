@@ -170,9 +170,7 @@ class CallLogViewModel(
             try {
                 val success = callLogRepository.deleteCallLog(callLog)
                 if (success) {
-                    sendSideEffect(CallLogSideEffect.ShowToast("Call log deleted"))
                     sendSideEffect(CallLogSideEffect.CallLogDeleted(callLog))
-                    // Note: You must call .refresh() on your UI's LazyPagingItems to reflect this deletion
                     loadStatistics()
                 }
             } catch (e: Exception) {

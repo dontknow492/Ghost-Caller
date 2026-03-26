@@ -2,7 +2,6 @@
 
 package com.ghost.caller.ui.screens.recent
 
-import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -24,9 +23,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.History
@@ -45,6 +44,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -73,7 +75,8 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import com.ghost.caller.ui.components.CallLogItem
-import com.ghost.caller.ui.components.contact.SearchBar
+import com.ghost.caller.ui.components.ConfirmDeleteDialog
+import com.ghost.caller.ui.components.ModernSearchTextField
 import com.ghost.caller.viewmodel.call.CallLogEntry
 import com.ghost.caller.viewmodel.recent.CallLogEvent
 import com.ghost.caller.viewmodel.recent.CallLogSideEffect
@@ -82,6 +85,7 @@ import com.ghost.caller.viewmodel.recent.CallLogViewModel
 import com.ghost.caller.viewmodel.recent.CallStatistics
 import com.ghost.caller.viewmodel.recent.GroupedCallLog
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 enum class CallAction {
     CALL, MESSAGE, INFO, DELETE, ADD_CONTACT, BLOCK, MARK_READ
@@ -94,14 +98,14 @@ fun CallLogScreen(
     onNavigateToCall: (String) -> Unit,
     onNavigateToSms: (String) -> Unit,
     onNavigateToContact: (String) -> Unit,
-    onNavigateToAddContact: (String, String?) -> Unit,
+    onNavigateToAddContact: (phoneNumber: String, name: String?) -> Unit,
     onKeypadClick: () -> Unit,
     navigationBar: (@Composable () -> Unit)?,
     viewModel: CallLogViewModel,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     rememberCoroutineScope()
-    val context = LocalContext.current
+    LocalContext.current
 
     val pagedCalls = viewModel.pagedCallLogs.collectAsLazyPagingItems()
 
@@ -109,10 +113,19 @@ fun CallLogScreen(
     var isSortDialogVisible by remember { mutableStateOf(false) }
 
 
+    var deleteTargets by remember { mutableStateOf<List<CallLogEntry>?>(null) }
+    var blockTarget by remember { mutableStateOf<String?>(null) }
+    var showClearAllDialog by remember { mutableStateOf(false) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+
     // Handle side effects
     LaunchedEffect(Unit) {
         viewModel.sideEffect.collectLatest { effect ->
             when (effect) {
+
                 is CallLogSideEffect.NavigateToCall -> {
                     onNavigateToCall(effect.phoneNumber)
                 }
@@ -130,35 +143,68 @@ fun CallLogScreen(
                 }
 
                 is CallLogSideEffect.ShowToast -> {
-                    Toast.makeText(
-                        context,
-                        effect.message,
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    scope.launch {
+                        snackbarHostState.showSnackbar(effect.message)
+                    }
                 }
 
                 is CallLogSideEffect.ShowError -> {
-                    Toast.makeText(
-                        context,
-                        effect.message,
-                        Toast.LENGTH_LONG
-                    ).show()
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = effect.message,
+                            withDismissAction = true
+                        )
+                    }
                 }
 
+                // 🔥 Dialog triggers (same)
                 is CallLogSideEffect.ShowDeleteConfirmation -> {
-                    // Show delete confirmation dialog
+                    deleteTargets = effect.callLogs
                 }
 
                 is CallLogSideEffect.ShowClearAllConfirmation -> {
-                    // Show clear all confirmation
+                    showClearAllDialog = true
                 }
 
                 is CallLogSideEffect.ShowBlockConfirmation -> {
-                    // Show block confirmation dialog
+                    blockTarget = effect.phoneNumber
                 }
 
-                is CallLogSideEffect.ExportCallLogs -> {
-                    // Handle export
+                // 🔥 Snackbar + Undo logic
+
+                is CallLogSideEffect.CallLogDeleted -> {
+                    scope.launch {
+                        pagedCalls.refresh()
+                        snackbarHostState.showSnackbar(
+                            message = "Call deleted",
+                            duration = SnackbarDuration.Short
+                        )
+
+                    }
+                }
+
+                is CallLogSideEffect.CallLogsDeleted -> {
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = "${effect.count} calls deleted"
+                        )
+                    }
+                }
+
+                is CallLogSideEffect.CallLogsCleared -> {
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = "Cleared ${effect.count} calls"
+                        )
+                    }
+                }
+
+                is CallLogSideEffect.BlockNumber -> {
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = "Blocked ${effect.phoneNumber}"
+                        )
+                    }
                 }
 
                 else -> {}
@@ -172,6 +218,9 @@ fun CallLogScreen(
         onRefresh = { pagedCalls.refresh() },
     ) {
         Scaffold(
+            snackbarHost = {
+                SnackbarHost(hostState = snackbarHostState)
+            },
             topBar = {
                 CallLogTopBar(
                     searchQuery = state.searchQuery,
@@ -225,7 +274,7 @@ fun CallLogScreen(
                         onClick = onKeypadClick,
                         modifier = Modifier
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Quick Actions")
+                        Icon(Icons.Default.Dialpad, contentDescription = "Quick Actions")
                     }
                 }
             }
@@ -476,6 +525,48 @@ fun CallLogScreen(
         )
     }
 
+
+    deleteTargets?.let { calls ->
+        ConfirmDeleteDialog(
+            title = "Delete Call Log",
+            message = "Are you sure you want to delete this call log?",
+            onDismiss = { deleteTargets = null },
+            onConfirm = {
+                viewModel.sendEvent(
+                    CallLogEvent.DeleteCallLogs(calls)
+                )
+                deleteTargets = null
+            }
+        )
+    }
+
+
+    blockTarget?.let { number ->
+        ConfirmDeleteDialog(
+            title = "Block Number",
+            message = "Are you sure you want to block this number?",
+            onDismiss = { blockTarget = null },
+            onConfirm = {
+                viewModel.sendEvent(
+                    CallLogEvent.BlockNumber(number)
+                )
+                blockTarget = null
+            }
+        )
+    }
+
+    if (showClearAllDialog) {
+        ConfirmDeleteDialog(
+            title = "Clear Call Logs",
+            message = "Are you sure you want to clear all call logs?",
+            onDismiss = { showClearAllDialog = false },
+            onConfirm = {
+                viewModel.sendEvent(CallLogEvent.ClearCallLogs)
+                showClearAllDialog = false
+            }
+        )
+    }
+
 }
 
 
@@ -672,15 +763,13 @@ fun CallLogTopBar(
                 }
             },
         )
-        SearchBar(
-            query = searchQuery,
-            onQueryChange = onSearchQueryChange,
-            onSearch = onSearchQueryChange,
-            active = searchQuery.isNotEmpty(),
-            onActiveChange = {},
-            modifier = Modifier
-                .fillMaxWidth()
 
+        ModernSearchTextField(
+            value = searchQuery,
+            onValueChange = onSearchQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = "Search Call Logs",
+            autoFocus = false
         )
     }
 }

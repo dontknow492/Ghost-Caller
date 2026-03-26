@@ -32,11 +32,12 @@ import kotlinx.coroutines.launch
 class AddEditContactViewModel(
     application: Application,
     private val contactRepository: ContactRepository,
-    private val contactId: String? = null
+    private val phoneNumber: String? = null,
+    private val name: String? = null,
 ) : AndroidViewModel(application) {
 
     // Private mutable state flow
-    private val _state = MutableStateFlow(AddEditContactState(isEditMode = contactId != null))
+    private val _state = MutableStateFlow(AddEditContactState(isEditMode = phoneNumber != null))
     val state: StateFlow<AddEditContactState> = _state.asStateFlow()
 
     // Side effects channel
@@ -60,8 +61,8 @@ class AddEditContactViewModel(
         }
 
         // Load contact if in edit mode
-        if (contactId != null) {
-            loadContact(contactId)
+        if (phoneNumber != null) {
+            loadContact(phoneNumber)
         }
 
         // Validate form on any change

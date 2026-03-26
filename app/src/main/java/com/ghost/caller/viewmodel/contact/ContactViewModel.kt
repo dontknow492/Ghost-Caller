@@ -13,6 +13,7 @@ import com.ghost.caller.repository.ContactFilter
 import com.ghost.caller.repository.ContactRepository
 import com.ghost.caller.repository.ContactSort
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -82,19 +84,29 @@ class ContactViewModel(
         )
 
     // Favorites paginated flow
-    val favoritesPagingFlow: Flow<PagingData<ContactQuickInfo>> = contactRepository
-        .getFavoriteContactsPaged()
-        .cachedIn(viewModelScope)
-        .stateIn(
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val favoritesPagingFlow: Flow<PagingData<ContactQuickInfo>> = _pagingConfig
+        .flatMapLatest { config ->
+            contactRepository
+                .getFavoriteContactsPaged(config.sortBy)
+                .cachedIn(viewModelScope)
+
+        }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = PagingData.empty()
         )
 
     // Recent contacts paginated flow
-    val recentContactsPagingFlow: Flow<PagingData<ContactQuickInfo>> = contactRepository
-        .getRecentContactsPaged()
-        .cachedIn(viewModelScope)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val recentContactsPagingFlow: Flow<PagingData<ContactQuickInfo>> = _pagingConfig
+        .flatMapLatest {
+            contactRepository
+                .getRecentContactsPaged(
+                    sortBy = it.sortBy,
+                    filter = it.filter
+                ).cachedIn(viewModelScope)
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -103,20 +115,28 @@ class ContactViewModel(
 
     // Search results paginated flow
     private val _searchQuery = MutableStateFlow("")
-    val searchResultsPagingFlow: Flow<PagingData<ContactQuickInfo>> = _searchQuery
-        .debounce(300)
-        .flatMapLatest { query ->
-            if (query.isNotBlank()) {
-                contactRepository.searchContactsPaged(query).cachedIn(viewModelScope)
-            } else {
-                flowOf(PagingData.empty())
-            }
+
+    @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+    val searchResultsPagingFlow: Flow<PagingData<ContactQuickInfo>> =
+        combine(
+            _searchQuery.debounce(300),
+            _pagingConfig
+        ) { query, config ->
+            query to config
         }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = PagingData.empty()
-        )
+            .flatMapLatest { (query, config) ->
+
+                if (query.isBlank()) {
+                    return@flatMapLatest flowOf(PagingData.empty())
+                }
+
+                contactRepository.searchContactsPaged(
+                    query = query,
+                    sortBy = config.sortBy,
+                    filter = config.filter,
+                )
+            }
+            .cachedIn(viewModelScope) // ✅ cache AFTER flatMapLatest
 
     // ========== Non-Paginated Data Flows ==========
 

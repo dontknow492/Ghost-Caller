@@ -4,11 +4,9 @@ package com.ghost.caller.ui.screens.call
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -22,14 +20,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -37,14 +37,25 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Dialpad
 import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.Face2
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FabPosition
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -57,34 +68,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
-import com.ghost.caller.presentation.call.CallViewModel
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import com.ghost.caller.models.ContactQuickInfo
+import com.ghost.caller.ui.components.ContactListItem
 import com.ghost.caller.viewmodel.call.CallEvent
-import com.ghost.caller.viewmodel.call.ContactSuggestion
+import com.ghost.caller.viewmodel.call.CallViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // Enhanced color palette
-private val ButtonDarkGray = Color(0xFF2A2D34)
-private val ButtonLightGray = Color(0xFF3A3D44)
-private val CallGreen = Color(0xFF34C759)
-private val CallRed = Color(0xFFFF3B30)
-private val GradientStart = Color(0xFF1A1C22)
-private val GradientEnd = Color(0xFF0F1117)
 
-@OptIn(ExperimentalAnimationApi::class)
+
+@OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun DialerScreen(
     viewModel: CallViewModel,
@@ -95,6 +100,10 @@ fun DialerScreen(
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     var isCalling by remember { mutableStateOf(false) }
+
+    val suggestions = viewModel.suggestions.collectAsLazyPagingItems()
+
+    var isDialpadExpanded by remember { mutableStateOf(true) }
 
     // Animation states
     val buttonScale by animateFloatAsState(
@@ -114,123 +123,149 @@ fun DialerScreen(
         }
     }
 
-    // Full screen background
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(GradientStart, GradientEnd),
-                    startY = 0f,
-                    endY = Float.POSITIVE_INFINITY
-                )
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text("Calls") },
+                navigationIcon = {
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Navigate Back",
+                        )
+                    }
+                }
             )
-    ) {
+        },
+        floatingActionButton = {
+            AnimatedVisibility(
+                visible = !isDialpadExpanded,
+            ) {
+                FloatingActionButton(
+                    onClick = { isDialpadExpanded = true }
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Dialpad,
+                        contentDescription = "Open Dialpad"
+                    )
+                }
+            }
+        },
+        floatingActionButtonPosition = FabPosition.End
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 32.dp, top = 48.dp), // Adjust top padding for status bar
+                .padding(paddingValues), // Adjust top padding for status bar
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // --- Header: Back Button ---
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.Start
-            ) {
-                IconButton(
-                    onClick = onNavigateBack,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = "Navigate Back",
-                        tint = Color.White
-                    )
-                }
-            }
-
             // --- Upper Area: Suggestions ---
             // Using a Column with weight(1f) here pushes the dialpad perfectly to the bottom
             // and provides the required ColumnScope for AnimatedVisibility!
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                AnimatedVisibility(
-                    visible = state.dialedNumber.isNotEmpty(),
-                    enter = fadeIn() + slideInVertically(initialOffsetY = { 50 }),
-                    exit = fadeOut() + slideOutVertically(targetOffsetY = { 50 })
-                ) {
-                    ContactSuggestionsList(
-                        suggestions = state.suggestions,
-                        onContactSelected = { contact ->
-                            viewModel.sendEvent(CallEvent.SelectContactSuggestion(contact))
-                            haptic.performHapticFeedback(HapticFeedbackType.KeyboardTap)
-                        }
-                    )
+            ContactSuggestionsList(
+                modifier = Modifier.weight(1f),
+                dialedPhoneNumber = state.dialedNumber,
+                suggestions = suggestions,
+                onContactSelected = { contact ->
+                    viewModel.sendEvent(CallEvent.SelectContactSuggestion(contact))
+                    haptic.performHapticFeedback(HapticFeedbackType.KeyboardTap)
                 }
-            }
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // --- Bottom Area: Number Display & Dialpad ---
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
+            AnimatedVisibility(
+                visible = isDialpadExpanded,
+                enter = fadeIn() + slideInVertically(initialOffsetY = { 50 }),
+                exit = fadeOut() + slideOutVertically(targetOffsetY = { 50 })
             ) {
-                // Number display with enhanced styling
-                NumberDisplay(
-                    number = state.dialedNumberFormatted,
-                    onDelete = {
-                        viewModel.sendEvent(CallEvent.DeleteDigit)
-                        haptic.performHapticFeedback(HapticFeedbackType.KeyboardTap)
-                    },
-                    onClear = {
-                        viewModel.sendEvent(CallEvent.ClearNumber)
-                        haptic.performHapticFeedback(HapticFeedbackType.KeyboardTap)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    HorizontalDivider()
+                    AnimatedVisibility(
+                        visible = state.dialedNumberFormatted.isNotEmpty()
+                    ) {
+                        // Number display with enhanced styling
+                        NumberDisplay(
+                            number = state.dialedNumberFormatted,
+                            onDelete = {
+                                viewModel.sendEvent(CallEvent.DeleteDigit)
+                                haptic.performHapticFeedback(HapticFeedbackType.KeyboardTap)
+                            },
+                        )
                     }
-                )
 
-                Spacer(modifier = Modifier.height(24.dp))
 
-                // Dialpad grid
-                MainDialpadGrid(
-                    onDigitClick = { digit ->
-                        viewModel.sendEvent(CallEvent.AppendDigit(digit))
-                        haptic.performHapticFeedback(HapticFeedbackType.KeyboardTap)
-                    },
-                    onLongPress = { digit ->
-                        when (digit) {
-                            "0" -> {
-                                viewModel.sendEvent(CallEvent.AppendDigit("+"))
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Dialpad grid
+                    MainDialpadGrid(
+                        onDigitClick = { digit ->
+                            viewModel.sendEvent(CallEvent.AppendDigit(digit))
+                            haptic.performHapticFeedback(HapticFeedbackType.KeyboardTap)
+                        },
+                        onLongPress = { digit ->
+                            when (digit) {
+                                "0" -> {
+                                    viewModel.sendEvent(CallEvent.AppendDigit("+"))
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                }
                             }
                         }
-                    }
-                )
+                    )
 
-                Spacer(modifier = Modifier.height(32.dp))
 
-                // Call button with animations
-                CallButton(
-                    isEnabled = state.dialedNumber.isNotEmpty() && !state.isLoading,
-                    isLoading = state.isLoading,
-                    scale = buttonScale,
-                    onClick = {
-                        coroutineScope.launch {
-                            isCalling = true
-                            viewModel.sendEvent(CallEvent.InitiateCall)
-                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                            delay(300)
-                            onCallInitiated()
-                            isCalling = false
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = { viewModel.sendEvent(CallEvent.ClearNumber) }
+                        ) {
+                            Text(
+                                text = "C",
+                                style = MaterialTheme.typography.headlineLarge
+                            )
+                        }
+                        CallButton(
+                            isEnabled = state.dialedNumber.isNotEmpty() && !state.isLoading,
+                            isLoading = state.isLoading,
+                            scale = buttonScale,
+                            onClick = {
+                                coroutineScope.launch {
+                                    isCalling = true
+                                    viewModel.sendEvent(CallEvent.InitiateCall)
+                                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                    delay(300)
+                                    onCallInitiated()
+                                    isCalling = false
+                                }
+                            }
+                        )
+                        IconButton(
+                            onClick = { isDialpadExpanded = false },
+                            modifier = Modifier
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Dialpad,
+                                contentDescription = "Hide Dialpad",
+                                modifier = Modifier.size(38.dp)
+                            )
                         }
                     }
-                )
+
+                }
             }
+
         }
 
         // Error message overlay
@@ -239,8 +274,7 @@ fun DialerScreen(
             enter = fadeIn() + slideInVertically(),
             exit = fadeOut() + slideOutVertically(),
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 100.dp)
+                .padding(paddingValues)
         ) {
             ErrorMessage(
                 message = state.error?.message ?: "",
@@ -252,12 +286,34 @@ fun DialerScreen(
 
 @Composable
 private fun ContactSuggestionsList(
-    suggestions: List<ContactSuggestion>,
-    onContactSelected: (ContactSuggestion) -> Unit
+    modifier: Modifier = Modifier,
+    dialedPhoneNumber: String,
+    suggestions: LazyPagingItems<ContactQuickInfo>,
+    onContactSelected: (ContactQuickInfo) -> Unit
 ) {
-    if (suggestions.isEmpty()) {
+    if (dialedPhoneNumber.isEmpty() && suggestions.itemCount == 0) {
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Face2,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp)
+                )
+                Text(
+                    text = "Start typing to get Suggestion",
+                    fontSize = 16.sp
+                )
+            }
+        }
+    } else if (suggestions.itemCount == 0) {
+        Box(
+            modifier = modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             Column(
@@ -267,31 +323,42 @@ private fun ContactSuggestionsList(
                 Icon(
                     imageVector = Icons.Rounded.SearchOff,
                     contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.4f),
                     modifier = Modifier.size(48.dp)
                 )
                 Text(
                     text = "No contacts found",
-                    color = Color.White.copy(alpha = 0.5f),
                     fontSize = 16.sp
                 )
             }
         }
     } else {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
             items(
-                items = suggestions,
-                key = { "${it.name}_${it.number}" }
-            ) { contact ->
-                ContactSuggestionRow(
-                    contact = contact,
-                    onClick = { onContactSelected(contact) }
-                )
+                count = suggestions.itemCount,
+                key = { index -> suggestions[index]?.id ?: index }
+            ) { index ->
+                suggestions[index]?.let { contactQuickInfo ->
+                    ContactListItem(
+                        modifier = Modifier,
+                        contact = contactQuickInfo,
+                        onClick = {
+                            onContactSelected(contactQuickInfo)
+                        },
+                        isSelectionMode = false,
+                        onLongClick = {},
+                        onFavoriteClick = {},
+                        onCallClick = {
+                            onContactSelected(contactQuickInfo)
+                        },
+                        isSelected = false
+                    )
+                }
             }
         }
+
     }
 }
 
@@ -299,7 +366,6 @@ private fun ContactSuggestionsList(
 private fun NumberDisplay(
     number: String,
     onDelete: () -> Unit,
-    onClear: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -310,7 +376,7 @@ private fun NumberDisplay(
     ) {
         Text(
             text = number.ifEmpty { "Enter number" },
-            color = if (number.isEmpty()) Color.White.copy(alpha = 0.3f) else Color.White,
+            color = MaterialTheme.colorScheme.primary,
             fontSize = 36.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
@@ -324,24 +390,12 @@ private fun NumberDisplay(
                 modifier = Modifier.align(Alignment.CenterEnd)
             ) {
                 IconButton(
-                    onClick = onClear,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = "Clear",
-                        tint = Color.White.copy(alpha = 0.5f),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                IconButton(
                     onClick = onDelete,
                     modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.Backspace,
                         contentDescription = "Delete",
-                        tint = Color.White.copy(alpha = 0.7f),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -356,37 +410,35 @@ private fun MainDialpadGrid(
     onLongPress: (String) -> Unit
 ) {
     val keys = listOf(
-        listOf(DialKey("1", ""), DialKey("2", "ABC"), DialKey("3", "DEF")),
-        listOf(DialKey("4", "GHI"), DialKey("5", "JKL"), DialKey("6", "MNO")),
-        listOf(DialKey("7", "PQRS"), DialKey("8", "TUV"), DialKey("9", "WXYZ")),
-        listOf(DialKey("*", ""), DialKey("0", "+"), DialKey("#", ""))
+        DialKey("1", ""), DialKey("2", "ABC"), DialKey("3", "DEF"),
+        DialKey("4", "GHI"), DialKey("5", "JKL"), DialKey("6", "MNO"),
+        DialKey("7", "PQRS"), DialKey("8", "TUV"), DialKey("9", "WXYZ"),
+        DialKey("*", ""), DialKey("0", "+"), DialKey("#", "")
     )
 
-    Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth()
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
     ) {
-        for (row in keys) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                for (key in row) {
-                    DialpadButton(
-                        number = key.number,
-                        letters = key.letters,
-                        onClick = { onDigitClick(key.number) },
-                        onLongPress = { onLongPress(key.number) }
-                    )
-                }
-            }
+        items(keys) { key ->
+            DialpadButton(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.7f),
+                number = key.number,
+                letters = key.letters,
+                onClick = { onDigitClick(key.number) },
+                onLongPress = { onLongPress(key.number) }
+            )
         }
     }
 }
 
 @Composable
 private fun DialpadButton(
+    modifier: Modifier = Modifier,
     number: String,
     letters: String,
     onClick: () -> Unit,
@@ -403,20 +455,13 @@ private fun DialpadButton(
         ), label = "DialpadScale"
     )
 
-    val backgroundColor by animateColorAsState(
-        targetValue = if (isPressed) ButtonLightGray else ButtonDarkGray,
-        animationSpec = tween(100), label = "DialpadColor"
-    )
 
     Box(
-        modifier = Modifier
-            .size(80.dp)
+        modifier = modifier
             .scale(scale)
-            .clip(CircleShape)
-            .background(backgroundColor)
             .clickable(
                 interactionSource = interactionSource,
-                indication = null,
+                indication = ripple(),
                 onClick = {
                     isPressed = true
                     onClick()
@@ -440,7 +485,6 @@ private fun DialpadButton(
         ) {
             Text(
                 text = number,
-                color = Color.White,
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Light,
                 letterSpacing = if (number == "0") 2.sp else 0.sp
@@ -448,7 +492,6 @@ private fun DialpadButton(
             if (letters.isNotEmpty()) {
                 Text(
                     text = letters,
-                    color = Color.White.copy(alpha = 0.5f),
                     fontSize = 10.sp,
                     letterSpacing = 0.5.sp
                 )
@@ -456,6 +499,7 @@ private fun DialpadButton(
         }
     }
 }
+
 
 @Composable
 private fun CallButton(
@@ -470,7 +514,7 @@ private fun CallButton(
             .scale(scale)
             .clip(CircleShape)
             .background(
-                if (isEnabled) CallGreen else Color(0xFF2A2D34),
+                if (isEnabled) MaterialTheme.colorScheme.primaryContainer else Color(0xFF2A2D34),
                 shape = CircleShape
             )
             .clickable(enabled = isEnabled) { onClick() },
@@ -486,118 +530,13 @@ private fun CallButton(
             Icon(
                 imageVector = Icons.Rounded.Call,
                 contentDescription = "Call",
-                tint = if (isEnabled) Color.White else Color.White.copy(alpha = 0.5f),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(36.dp)
             )
         }
     }
 }
 
-@Composable
-private fun ContactSuggestionRow(
-    contact: ContactSuggestion,
-    onClick: () -> Unit
-) {
-    var isPressed by remember { mutableStateOf(false) }
-
-    val backgroundColor by animateColorAsState(
-        targetValue = if (isPressed) ButtonLightGray else Color.Transparent,
-        animationSpec = tween(100), label = "SuggestionBg"
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(backgroundColor)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = {
-                    isPressed = true
-                    onClick()
-                    isPressed = false
-                }
-            )
-            .padding(vertical = 12.dp, horizontal = 24.dp), // Increased horizontal padding
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Avatar with gradient
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(CallGreen, CallGreen.copy(alpha = 0.7f)),
-                        start = Offset(0f, 0f),
-                        end = Offset(0f, Float.POSITIVE_INFINITY)
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            if (contact.photoUri != null) {
-                AsyncImage(
-                    model = contact.photoUri,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Text(
-                    text = contact.name.take(2).uppercase(),
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        // Contact info
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = contact.name,
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = contact.contactType ?: "Mobile",
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 12.sp
-                )
-                Text(
-                    text = "•",
-                    color = Color.White.copy(alpha = 0.3f),
-                    fontSize = 12.sp
-                )
-                Text(
-                    text = formatPhoneNumber(contact.number),
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-
-        // Call icon
-        Icon(
-            imageVector = Icons.Rounded.Call,
-            contentDescription = "Call",
-            tint = CallGreen,
-            modifier = Modifier.size(24.dp)
-        )
-    }
-}
 
 @Composable
 private fun ErrorMessage(
@@ -609,7 +548,7 @@ private fun ErrorMessage(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         colors = CardDefaults.cardColors(
-            containerColor = CallRed.copy(alpha = 0.9f)
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f)
         ),
         shape = RoundedCornerShape(12.dp)
     ) {
@@ -628,12 +567,10 @@ private fun ErrorMessage(
                 Icon(
                     imageVector = Icons.Rounded.Error,
                     contentDescription = null,
-                    tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
                 Text(
                     text = message,
-                    color = Color.White,
                     fontSize = 13.sp,
                 )
             }
@@ -644,7 +581,6 @@ private fun ErrorMessage(
                 Icon(
                     imageVector = Icons.Rounded.Close,
                     contentDescription = "Dismiss",
-                    tint = Color.White,
                     modifier = Modifier.size(16.dp)
                 )
             }

@@ -20,8 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
 import com.ghost.caller.models.ContactQuickInfo
-import com.ghost.caller.ui.components.contact.ContactGridItem
-import com.ghost.caller.ui.components.contact.ContactListItem
+import com.ghost.caller.ui.components.ContactGridItem
+import com.ghost.caller.ui.components.ContactListItem
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

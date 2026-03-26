@@ -24,16 +24,16 @@ data class MyNavigationBarItem(
 
 val items = listOf<MyNavigationBarItem>(
     MyNavigationBarItem(
-        icon = Icons.Filled.Home,
+        selectedIcon = Icons.Filled.Home,
         label = "Recent Call",
         key = NavigationBarKey.RecentCall,
-        selectedIcon = Icons.Outlined.Home
+        icon = Icons.Outlined.Home
     ),
     MyNavigationBarItem(
-        icon = Icons.Filled.Contacts,
+        selectedIcon = Icons.Filled.Contacts,
         label = "Contacts",
         key = NavigationBarKey.Contacts,
-        selectedIcon = Icons.Outlined.Contacts
+        icon = Icons.Outlined.Contacts
     )
 )
 

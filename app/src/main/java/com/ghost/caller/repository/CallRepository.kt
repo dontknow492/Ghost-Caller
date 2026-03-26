@@ -32,6 +32,10 @@ import com.ghost.caller.models.PhoneNumber
 import com.ghost.caller.models.PhoneNumberData
 import com.ghost.caller.models.PhoneNumberType
 import com.ghost.caller.models.PostalAddress
+import com.ghost.caller.repository.paging.ContactsPagingSource
+import com.ghost.caller.repository.paging.FavoriteContactsPagingSource
+import com.ghost.caller.repository.paging.RecentContactsPagingSource
+import com.ghost.caller.repository.paging.SearchContactsPagingSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -76,8 +80,9 @@ class ContactRepository(
     ): Flow<PagingData<ContactQuickInfo>> {
         return Pager(
             config = PagingConfig(
+                prefetchDistance = 10,
                 pageSize = PAGE_SIZE,
-                enablePlaceholders = true,
+                enablePlaceholders = false,
                 maxSize = PAGE_SIZE * 3
             ),
             pagingSourceFactory = {
@@ -89,11 +94,18 @@ class ContactRepository(
     /**
      * Get favorite contacts with pagination
      */
-    fun getFavoriteContactsPaged(): Flow<PagingData<ContactQuickInfo>> {
+    fun getFavoriteContactsPaged(
+        sortBy: ContactSort,
+    ): Flow<PagingData<ContactQuickInfo>> {
         return Pager(
-            config = PagingConfig(pageSize = PAGE_SIZE),
+            config = PagingConfig(
+                prefetchDistance = 10,
+                pageSize = PAGE_SIZE,
+                enablePlaceholders = false,
+                maxSize = PAGE_SIZE * 3
+            ),
             pagingSourceFactory = {
-                FavoriteContactsPagingSource(context, hasContactsPermission())
+                FavoriteContactsPagingSource(context, hasContactsPermission(), sortBy)
             }
         ).flow
     }
@@ -101,11 +113,24 @@ class ContactRepository(
     /**
      * Get recent contacts with pagination
      */
-    fun getRecentContactsPaged(): Flow<PagingData<ContactQuickInfo>> {
+    fun getRecentContactsPaged(
+        sortBy: ContactSort = ContactSort.RECENT_ASC,
+        filter: ContactFilter = ContactFilter.ALL
+    ): Flow<PagingData<ContactQuickInfo>> {
         return Pager(
-            config = PagingConfig(pageSize = PAGE_SIZE),
+            config = PagingConfig(
+                prefetchDistance = 10,
+                pageSize = PAGE_SIZE,
+                enablePlaceholders = false,
+                maxSize = PAGE_SIZE * 3
+            ),
             pagingSourceFactory = {
-                RecentContactsPagingSource(context, hasContactsPermission())
+                RecentContactsPagingSource(
+                    context,
+                    hasContactsPermission(),
+                    sortBy,
+                    filter
+                )
             }
         ).flow
     }
@@ -113,13 +138,28 @@ class ContactRepository(
     /**
      * Search contacts with pagination
      */
-    fun searchContactsPaged(query: String): Flow<PagingData<ContactQuickInfo>> {
+    fun searchContactsPaged(
+        query: String,
+        sortBy: ContactSort,
+        filter: ContactFilter,
+    ): Flow<PagingData<ContactQuickInfo>> {
         return Pager(
-            config = PagingConfig(pageSize = PAGE_SIZE),
+            config = PagingConfig(
+                prefetchDistance = 10,
+                pageSize = PAGE_SIZE,
+                enablePlaceholders = false,
+                maxSize = PAGE_SIZE * 3
+            ),
             pagingSourceFactory = {
-                SearchContactsPagingSource(context, query, hasContactsPermission())
+                SearchContactsPagingSource(
+                    context = context,
+                    query = query.trim(),
+                    hasPermission = hasContactsPermission(),
+                    sortBy = sortBy,
+                    filter = filter
+                )
             }
-        ).flow
+        ).flow // 🔥 important
     }
 
     /**
@@ -1079,4 +1119,17 @@ enum class ContactSort {
 enum class ContactFilter {
     ALL,
     STARRED
+}
+
+
+fun isValidPhone(number: String?): Boolean {
+    if (number.isNullOrBlank()) return false
+
+    val cleaned = number.filter { it.isDigit() || it == '+' }
+
+    return cleaned.length >= 5 // basic sanity (avoid junk like "1", "*", etc)
+}
+
+fun normalizeNumber(number: String): String {
+    return number.filter { it.isDigit() }
 }

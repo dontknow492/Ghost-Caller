@@ -1,9 +1,10 @@
-package com.ghost.caller.repository
+package com.ghost.caller.repository.paging
 
 import android.content.Context
 import android.provider.CallLog
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import com.ghost.caller.repository.CallLogRepository
 import com.ghost.caller.viewmodel.call.CallLogEntry
 import com.ghost.caller.viewmodel.call.CallType
 import com.ghost.caller.viewmodel.recent.DateRange

@@ -10,8 +10,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.ghost.caller.presentation.call.CallViewModel
+import com.ghost.caller.viewmodel.call.CallEvent
 import com.ghost.caller.viewmodel.call.CallSideEffect
+import com.ghost.caller.viewmodel.call.CallViewModel
 import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -19,10 +20,20 @@ import kotlinx.coroutines.flow.collectLatest
 fun CallScreen(
     onNavigateBack: () -> Unit,
     viewModel: CallViewModel,
+    phoneNumber: String?,
+    initiateCallDirectly: Boolean,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     rememberCoroutineScope()
     val context = LocalContext.current
+
+    LaunchedEffect(phoneNumber, initiateCallDirectly) {
+        if (initiateCallDirectly && !phoneNumber.isNullOrEmpty()) {
+            viewModel.sendEvent(CallEvent.InitiateCallDirectly(phoneNumber))
+        } else if (!phoneNumber.isNullOrEmpty()) {
+            viewModel.sendEvent(CallEvent.SetNumber(phoneNumber))
+        }
+    }
 
     // Handle side effects
     LaunchedEffect(Unit) {

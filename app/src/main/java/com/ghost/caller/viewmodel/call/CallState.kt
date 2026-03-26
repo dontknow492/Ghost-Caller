@@ -1,6 +1,19 @@
 package com.ghost.caller.viewmodel.call
 
 import android.net.Uri
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.CallMade
+import androidx.compose.material.icons.automirrored.rounded.CallMissed
+import androidx.compose.material.icons.automirrored.rounded.CallReceived
+import androidx.compose.material.icons.automirrored.rounded.HelpOutline
+import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.rounded.CallEnd
+import androidx.compose.material.icons.rounded.Voicemail
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.ghost.caller.models.ContactQuickInfo
 
 // --- STATE MANAGEMENT ---
 
@@ -22,6 +35,57 @@ data class CallLogEntry(
     val isVideoCall: Boolean,       // NEW: Was it a video call?
     var groupedCount: Int = 1       // NEW: To show "Jane Doe (3)"
 )
+
+
+fun getCallTypeText(call: CallLogEntry): String {
+    return when (call.type) {
+        CallType.INCOMING -> "Incoming"
+        CallType.OUTGOING -> "Outgoing"
+        CallType.MISSED -> "Missed"
+        CallType.REJECTED -> "Rejected"
+        CallType.BLOCKED -> "Blocked"
+        CallType.VOICEMAIL -> "Voicemail"
+        else -> "Call"
+    }
+}
+
+
+@Composable
+fun getCallTypeColor(call: CallLogEntry): Color {
+    return when (call.type) {
+        CallType.MISSED -> MaterialTheme.colorScheme.error
+        CallType.INCOMING -> MaterialTheme.colorScheme.primary
+        CallType.OUTGOING -> MaterialTheme.colorScheme.secondary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
+
+@Composable
+fun getCallTypeContainerColor(type: CallType): Color {
+    val scheme = MaterialTheme.colorScheme
+
+    return when (type) {
+        CallType.INCOMING -> scheme.primary.copy(alpha = 0.15f)
+        CallType.OUTGOING -> scheme.secondary.copy(alpha = 0.15f)
+        CallType.MISSED -> scheme.error.copy(alpha = 0.15f)
+        CallType.REJECTED -> scheme.error.copy(alpha = 0.12f)
+        CallType.BLOCKED -> scheme.error.copy(alpha = 0.10f)
+        CallType.VOICEMAIL -> scheme.tertiary.copy(alpha = 0.15f)
+        CallType.UNKNOWN -> scheme.surfaceVariant
+    }
+}
+
+fun getCallTypeIcon(type: CallType): ImageVector {
+    return when (type) {
+        CallType.INCOMING -> Icons.AutoMirrored.Rounded.CallReceived
+        CallType.OUTGOING -> Icons.AutoMirrored.Rounded.CallMade
+        CallType.MISSED -> Icons.AutoMirrored.Rounded.CallMissed
+        CallType.REJECTED -> Icons.Rounded.CallEnd
+        CallType.BLOCKED -> Icons.Rounded.Block
+        CallType.VOICEMAIL -> Icons.Rounded.Voicemail
+        CallType.UNKNOWN -> Icons.AutoMirrored.Rounded.HelpOutline
+    }
+}
 
 
 /**
@@ -48,7 +112,6 @@ data class CallState(
     // Dialer state
     val dialedNumber: String = "",
     val dialedNumberFormatted: String = "",
-    val suggestions: List<ContactSuggestion> = emptyList(),
     val showDialpad: Boolean = true,
 
     // UI state
@@ -144,8 +207,7 @@ sealed class CallEvent {
     object DeleteDigit : CallEvent()
     data class SetNumber(val number: String) : CallEvent()
     object ClearNumber : CallEvent()
-    data class SearchContacts(val query: String) : CallEvent()
-    data class SelectContactSuggestion(val contact: ContactSuggestion) : CallEvent()
+    data class SelectContactSuggestion(val contact: ContactQuickInfo) : CallEvent()
 
     // Call actions
     object InitiateCall : CallEvent()

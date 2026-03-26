@@ -3,7 +3,6 @@
 package com.ghost.caller.ui.screens.call
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +36,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,9 +50,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.ghost.caller.presentation.call.CallViewModel
 import com.ghost.caller.viewmodel.call.CallEvent
 import com.ghost.caller.viewmodel.call.CallStatus
+import com.ghost.caller.viewmodel.call.CallViewModel
 
 // Modern Dark Theme Colors for the Call Screen
 private val BackgroundGradient = Brush.verticalGradient(
@@ -70,6 +72,8 @@ fun ActiveCallScreen(
     viewModel: CallViewModel
 ) {
     val state by viewModel.state.collectAsState()
+
+    var showDialpad by remember { mutableStateOf(false) }
 
     // Main Container with modern static gradient background
     Box(
@@ -96,8 +100,8 @@ fun ActiveCallScreen(
 
             // --- MIDDLE SECTION: Controls Grid OR Dialpad ---
             Crossfade(
-                targetState = state.showDialpad,
-                animationSpec = tween(300),
+                targetState = showDialpad,
+//                animationSpec = tween(300),
                 label = "ControlsVsDialpad"
             ) { showDialpad ->
                 if (showDialpad) {
@@ -124,11 +128,10 @@ fun ActiveCallScreen(
             // --- BOTTOM ROW: Speaker, End Call, Dialpad Toggle ---
             BottomCallBar(
                 isSpeakerOn = state.isSpeakerOn,
-                isDialpadOpen = state.showDialpad,
+                isDialpadOpen = showDialpad,
                 onSpeakerToggle = { viewModel.sendEvent(CallEvent.ToggleSpeaker) },
                 onDialpadToggle = {
-                    if (state.showDialpad) viewModel.sendEvent(CallEvent.HideDialpad)
-                    else viewModel.sendEvent(CallEvent.ShowDialpad)
+                    showDialpad = !showDialpad
                 },
                 onEndCall = { viewModel.sendEvent(CallEvent.EndCall) }
             )

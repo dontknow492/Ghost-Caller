@@ -52,8 +52,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.ghost.caller.presentation.call.CallViewModel
 import com.ghost.caller.viewmodel.call.CallEvent
+import com.ghost.caller.viewmodel.call.CallViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 

@@ -1,17 +1,18 @@
 package com.ghost.caller.ui.navigation
 
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
-import com.ghost.caller.presentation.call.CallViewModel
 import com.ghost.caller.ui.screens.call.CallScreen
 import com.ghost.caller.ui.screens.contact.AddEditContactScreen
 import com.ghost.caller.ui.screens.contact.ContactScreen
 import com.ghost.caller.ui.screens.recent.CallLogScreen
+import com.ghost.caller.viewmodel.call.CallViewModel
 import com.ghost.caller.viewmodel.contact.ContactViewModel
 import com.ghost.caller.viewmodel.contact.add.AddEditContactViewModel
 import com.ghost.caller.viewmodel.recent.CallLogViewModel
@@ -31,10 +32,10 @@ sealed interface NavigationBarKey : NavKey {
 }
 
 @Serializable
-data class ContactDetailKey(val contact: String? = null) : NavKey
+data class ContactDetailKey(val phoneNumber: String? = null, val name: String? = null) : NavKey
 
 @Serializable
-data class CallScreenKey(val callId: String) : NavKey
+data class CallScreenKey(val phoneNumber: String?, val initiateCall: Boolean) : NavKey
 
 
 @Composable
@@ -48,23 +49,27 @@ fun AppNavigation(
 
     NavDisplay(
         backStack = backStack,
-        onBack = { backStack.removeLastOrNull() },
+        onBack = {
+            backStack.removeLastOrNull()
+        },
         entryProvider = { key ->
             when (key) {
                 NavigationBarKey.RecentCall -> NavEntry(key) {
                     CallLogScreen(
-                        onNavigateToCall = { /* TODO: implement */ },
+                        onNavigateToCall = {
+                            backStack.add(CallScreenKey(it, true))
+                        },
                         onNavigateToSms = { /* TODO: implement */ },
                         onNavigateToContact = { contactId ->
                             backStack.add(ContactDetailKey(contactId))
                         },
-                        onNavigateToAddContact = { _, _ ->
-                            backStack.add(ContactDetailKey(null))
+                        onNavigateToAddContact = { phoneNumber, name ->
+                            backStack.add(ContactDetailKey(phoneNumber, name))
                         },
                         navigationBar = {
-                            CallerNavigationBar(onClick = backStack::add)
+                            CallerNavigationBar(onClick = backStack::add, selected = 0)
                         },
-                        onKeypadClick = { backStack.add(CallScreenKey("")) },
+                        onKeypadClick = { backStack.add(CallScreenKey(null, false)) },
                         viewModel = callLogViewModel,
                     )
                 }
@@ -81,11 +86,13 @@ fun AppNavigation(
                             Timber.d("Editing contact: $contactId")
                             backStack.add(ContactDetailKey(contactId))
                         },
-                        onNavigateToCall = { /* TODO: implement */ },
+                        onNavigateToCall = { phoneNumber ->
+                            backStack.add(CallScreenKey(phoneNumber, true))
+                        },
                         onNavigateToSms = { /* TODO: implement */ },
                         onNavigateToEmail = { /* TODO: implement */ },
                         navigationBar = {
-                            CallerNavigationBar(onClick = backStack::add)
+                            CallerNavigationBar(onClick = backStack::add, selected = 1)
                         },
                         viewModel = contactViewModel
                     )
@@ -93,9 +100,13 @@ fun AppNavigation(
 
                 is ContactDetailKey -> NavEntry(key) {
                     val viewModel: AddEditContactViewModel =
-                        koinViewModel(key = key.contact) { parametersOf(key.contact) }
+                        koinViewModel(key = key.phoneNumber) {
+                            parametersOf(
+                                key.phoneNumber,
+                                key.name
+                            )
+                        }
                     AddEditContactScreen(
-                        contactId = key.contact,
                         onNavigateBack = { backStack.removeLastOrNull() },
                         viewModel = viewModel
                     )
@@ -104,12 +115,29 @@ fun AppNavigation(
                 is CallScreenKey -> NavEntry(key) {
                     CallScreen(
                         onNavigateBack = { backStack.removeLastOrNull() },
-                        viewModel = callViewModel
+                        viewModel = callViewModel,
+                        phoneNumber = key.phoneNumber,
+                        initiateCallDirectly = key.initiateCall
                     )
                 }
 
                 else -> throw IllegalArgumentException("Unknown key: $key")
             }
-        }
+        },
+        transitionSpec = {
+            // Slide in from right when navigating forward
+            slideInHorizontally(initialOffsetX = { it }) togetherWith
+                    slideOutHorizontally(targetOffsetX = { -it })
+        },
+        popTransitionSpec = {
+            // Slide in from left when navigating back
+            slideInHorizontally(initialOffsetX = { -it }) togetherWith
+                    slideOutHorizontally(targetOffsetX = { it })
+        },
+        predictivePopTransitionSpec = {
+            // Slide in from left when navigating back
+            slideInHorizontally(initialOffsetX = { -it }) togetherWith
+                    slideOutHorizontally(targetOffsetX = { it })
+        },
     )
 }

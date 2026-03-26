@@ -6,6 +6,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.CircularProgressIndicator
@@ -13,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,17 +27,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.ghost.caller.models.ContactQuickInfo
 import com.ghost.caller.ui.components.ConfirmDeleteDialog
-import com.ghost.caller.ui.components.contact.ContactTabs
-import com.ghost.caller.ui.components.contact.ContactTopBar
-import com.ghost.caller.ui.components.contact.EmptyContactsView
-import com.ghost.caller.ui.components.contact.EmptyFavoritesView
-import com.ghost.caller.ui.components.contact.EmptyGroupsView
-import com.ghost.caller.ui.components.contact.EmptyRecentView
-import com.ghost.caller.ui.components.contact.EmptySearchView
-import com.ghost.caller.ui.components.contact.GroupsList
+import com.ghost.caller.ui.components.GroupsList
 import com.ghost.caller.ui.screens.recent.CallLogSelectionBottomBar
 import com.ghost.caller.ui.screens.recent.ErrorView
 import com.ghost.caller.viewmodel.contact.ContactPagingList
@@ -61,11 +57,6 @@ fun ContactScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    // Collect paginated data
-    val contactsPagingItems = viewModel.contactsPagingFlow.collectAsLazyPagingItems()
-    val favoritesPagingItems = viewModel.favoritesPagingFlow.collectAsLazyPagingItems()
-    val recentContactsPagingItems = viewModel.recentContactsPagingFlow.collectAsLazyPagingItems()
-    val searchResultsPagingItems = viewModel.searchResultsPagingFlow.collectAsLazyPagingItems()
 
     val contactGroups by viewModel.contactGroupsWithUi.collectAsStateWithLifecycle()
 
@@ -74,12 +65,12 @@ fun ContactScreen(
     var isDeleteDialogVisible by remember { mutableStateOf<List<String>>(emptyList()) }
 
 
-    val currentItems = when (uiState.currentTab) {
-        ContactTab.CONTACTS -> contactsPagingItems
-        ContactTab.FAVORITES -> favoritesPagingItems
-        ContactTab.RECENT -> recentContactsPagingItems
-        ContactTab.SEARCH -> contactsPagingItems // Handled by pagedContacts internally
-        ContactTab.GROUPS -> contactsPagingItems // Handled by pagedContacts internally
+    val currentItems: LazyPagingItems<ContactQuickInfo> = when (uiState.currentTab) {
+        ContactTab.CONTACTS -> viewModel.contactsPagingFlow.collectAsLazyPagingItems()
+        ContactTab.FAVORITES -> viewModel.favoritesPagingFlow.collectAsLazyPagingItems()
+        ContactTab.RECENT -> viewModel.recentContactsPagingFlow.collectAsLazyPagingItems()
+        ContactTab.SEARCH -> viewModel.searchResultsPagingFlow.collectAsLazyPagingItems()
+        ContactTab.GROUPS -> viewModel.contactsPagingFlow.collectAsLazyPagingItems()
     }
 
 
@@ -238,225 +229,127 @@ fun ContactScreen(
                         ContactTabs(
                             currentTab = uiState.currentTab,
                             onTabSelected = { tab ->
-                                viewModel.sendEvent(ContactUiEvent.ChangeTab(tab))
+                                viewModel.sendEvent(
+                                    ContactUiEvent.ChangeTab(
+                                        tab
+                                    )
+                                )
                             },
                             modifier = Modifier.fillMaxSize()
                         ) {
                             when (uiState.currentTab) {
                                 ContactTab.CONTACTS -> {
-                                    if (uiState.searchQuery.isNotEmpty()) {
-                                        // Search results
-                                        if (searchResultsPagingItems.itemCount == 0 && searchResultsPagingItems.loadState.refresh !is LoadState.Loading) {
-                                            EmptyContactsView(
-                                                message = "No contacts found for '${uiState.searchQuery}'",
-                                                onAddClick = { viewModel.navigateToAddContact() }
-                                            )
-                                        } else {
-                                            ContactPagingList(
-                                                pagingItems = searchResultsPagingItems,
-                                                viewMode = uiState.viewMode,
+                                    ContactListOrEmpty(
+                                        pagingItems = currentItems,
+                                        emptyMessage = if (uiState.searchQuery.isNotEmpty())
+                                            "No contacts found for '${uiState.searchQuery}'"
+                                        else
+                                            "No contacts yet",
+                                        viewMode = uiState.viewMode,
+                                        isSelectionMode = uiState.isSelectionMode,
+                                        selectedContacts = uiState.selectedContacts,
+                                        onContactClick = { contact ->
+                                            handleContactClick(
+                                                contact = contact,
                                                 isSelectionMode = uiState.isSelectionMode,
-                                                selectedContacts = uiState.selectedContacts,
-                                                onContactClick = { contact ->
-                                                    handleContactClick(
-                                                        contact = contact,
-                                                        isSelectionMode = uiState.isSelectionMode,
-                                                        onSelect = {
-                                                            viewModel.sendEvent(
-                                                                ContactUiEvent.ToggleContactSelection(
-                                                                    it
-                                                                )
-                                                            )
-                                                        },
-                                                        onNavigate = {
-                                                            viewModel.sendEvent(
-                                                                ContactUiEvent.SelectContact(it)
-                                                            )
-                                                        }
-                                                    )
-                                                },
-                                                onContactLongClick = { contact ->
-                                                    if (!uiState.isSelectionMode) {
-                                                        viewModel.sendEvent(
-                                                            ContactUiEvent.ToggleSelectionMode(
-                                                                true
-                                                            )
-                                                        )
-                                                        viewModel.sendEvent(
-                                                            ContactUiEvent.ToggleContactSelection(
-                                                                contact.id
-                                                            )
-                                                        )
-                                                    }
-                                                },
-                                                onFavoriteClick = { contact, isStarred ->
+                                                onSelect = {
                                                     viewModel.sendEvent(
-                                                        ContactUiEvent.ToggleFavorite(
-                                                            contact.id,
-                                                            !isStarred
+                                                        ContactUiEvent.ToggleContactSelection(
+                                                            it
                                                         )
                                                     )
                                                 },
-                                                onCallClick = { phoneNumber ->
-                                                    viewModel.callContact(phoneNumber)
-                                                },
-                                                modifier = Modifier.fillMaxSize()
-                                            )
-                                        }
-                                    } else {
-                                        // All contacts
-                                        if (contactsPagingItems.itemCount == 0 && contactsPagingItems.loadState.refresh !is LoadState.Loading) {
-                                            EmptyContactsView(
-                                                message = "No contacts yet",
-                                                onAddClick = { viewModel.navigateToAddContact() }
-                                            )
-                                        } else {
-                                            ContactPagingList(
-                                                pagingItems = contactsPagingItems,
-                                                viewMode = uiState.viewMode,
-                                                isSelectionMode = uiState.isSelectionMode,
-                                                selectedContacts = uiState.selectedContacts,
-                                                onContactClick = { contact ->
-                                                    handleContactClick(
-                                                        contact = contact,
-                                                        isSelectionMode = uiState.isSelectionMode,
-                                                        onSelect = {
-                                                            viewModel.sendEvent(
-                                                                ContactUiEvent.ToggleContactSelection(
-                                                                    it
-                                                                )
-                                                            )
-                                                        },
-                                                        onNavigate = {
-                                                            viewModel.sendEvent(
-                                                                ContactUiEvent.SelectContact(it)
-                                                            )
-                                                        }
-                                                    )
-                                                },
-                                                onContactLongClick = { contact ->
-                                                    if (!uiState.isSelectionMode) {
-                                                        viewModel.sendEvent(
-                                                            ContactUiEvent.ToggleSelectionMode(
-                                                                true
-                                                            )
-                                                        )
-                                                        viewModel.sendEvent(
-                                                            ContactUiEvent.ToggleContactSelection(
-                                                                contact.id
-                                                            )
-                                                        )
-                                                    }
-                                                },
-                                                onFavoriteClick = { contact, isStarred ->
+                                                onNavigate = {
                                                     viewModel.sendEvent(
-                                                        ContactUiEvent.ToggleFavorite(
-                                                            contact.id,
-                                                            !isStarred
+                                                        ContactUiEvent.SelectContact(
+                                                            it
                                                         )
                                                     )
-                                                },
-                                                onCallClick = { phoneNumber ->
-                                                    viewModel.callContact(phoneNumber)
-                                                },
-                                                modifier = Modifier.fillMaxSize()
+                                                }
                                             )
-                                        }
-                                    }
+                                        },
+                                        onContactLongClick = { contact ->
+                                            if (!uiState.isSelectionMode) {
+                                                viewModel.sendEvent(
+                                                    ContactUiEvent.ToggleSelectionMode(
+                                                        true
+                                                    )
+                                                )
+                                                viewModel.sendEvent(
+                                                    ContactUiEvent.ToggleContactSelection(
+                                                        contact.id
+                                                    )
+                                                )
+                                            }
+                                        },
+                                        onFavoriteClick = { contact, isStarred ->
+                                            viewModel.sendEvent(
+                                                ContactUiEvent.ToggleFavorite(
+                                                    contact.id,
+                                                    !isStarred
+                                                )
+                                            )
+                                        },
+                                        onCallClick = { phoneNumber ->
+                                            viewModel.callContact(phoneNumber)
+                                        },
+                                        onAddClick = { viewModel.navigateToAddContact() },
+                                        modifier = Modifier.fillMaxSize()
+                                    )
                                 }
 
                                 ContactTab.FAVORITES -> {
-                                    if (favoritesPagingItems.itemCount == 0 && favoritesPagingItems.loadState.refresh !is LoadState.Loading) {
-                                        EmptyFavoritesView(
-                                            onAddClick = { viewModel.navigateToAddContact() }
-                                        )
-                                    } else {
-                                        ContactPagingList(
-                                            pagingItems = favoritesPagingItems,
-                                            viewMode = uiState.viewMode,
-                                            isSelectionMode = false,
-                                            selectedContacts = emptySet(),
-                                            onContactClick = { contact ->
-                                                viewModel.sendEvent(
-                                                    ContactUiEvent.SelectContact(
-                                                        contact.id
-                                                    )
+                                    ContactListOrEmpty(
+                                        pagingItems = currentItems,
+                                        emptyMessage = "No favorites yet",
+                                        viewMode = uiState.viewMode,
+                                        onContactClick = { contact ->
+                                            viewModel.sendEvent(
+                                                ContactUiEvent.SelectContact(contact.id)
+                                            )
+                                        },
+                                        onFavoriteClick = { contact, isStarred ->
+                                            viewModel.sendEvent(
+                                                ContactUiEvent.ToggleFavorite(
+                                                    contact.id,
+                                                    !isStarred
                                                 )
-                                            },
-                                            onFavoriteClick = { contact, isStarred ->
-                                                viewModel.sendEvent(
-                                                    ContactUiEvent.ToggleFavorite(
-                                                        contact.id,
-                                                        !isStarred
-                                                    )
-                                                )
-                                            },
-                                            onCallClick = { phoneNumber ->
-                                                viewModel.callContact(phoneNumber)
-                                            },
-                                            onContactLongClick = { contact ->
-                                                if (!uiState.isSelectionMode) {
-                                                    viewModel.sendEvent(
-                                                        ContactUiEvent.ToggleSelectionMode(
-                                                            true
-                                                        )
-                                                    )
-                                                    viewModel.sendEvent(
-                                                        ContactUiEvent.ToggleContactSelection(
-                                                            contact.id
-                                                        )
-                                                    )
-                                                }
-                                            },
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    }
+                                            )
+                                        },
+                                        onCallClick = { phoneNumber ->
+                                            viewModel.callContact(
+                                                phoneNumber
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxSize()
+                                    )
                                 }
 
                                 ContactTab.RECENT -> {
-                                    if (recentContactsPagingItems.itemCount == 0 && recentContactsPagingItems.loadState.refresh !is LoadState.Loading) {
-                                        EmptyRecentView()
-                                    } else {
-                                        ContactPagingList(
-                                            pagingItems = recentContactsPagingItems,
-                                            viewMode = uiState.viewMode,
-                                            isSelectionMode = false,
-                                            selectedContacts = emptySet(),
-                                            onContactClick = { contact ->
-                                                viewModel.sendEvent(
-                                                    ContactUiEvent.SelectContact(
-                                                        contact.id
-                                                    )
+                                    ContactListOrEmpty(
+                                        pagingItems = currentItems,
+                                        emptyMessage = "No recent contacts",
+                                        viewMode = uiState.viewMode,
+                                        onContactClick = { contact ->
+                                            viewModel.sendEvent(
+                                                ContactUiEvent.SelectContact(contact.id)
+                                            )
+                                        },
+                                        onFavoriteClick = { contact, isStarred ->
+                                            viewModel.sendEvent(
+                                                ContactUiEvent.ToggleFavorite(
+                                                    contact.id,
+                                                    !isStarred
                                                 )
-                                            },
-                                            onFavoriteClick = { contact, isStarred ->
-                                                viewModel.sendEvent(
-                                                    ContactUiEvent.ToggleFavorite(
-                                                        contact.id,
-                                                        !isStarred
-                                                    )
-                                                )
-                                            },
-                                            onCallClick = { phoneNumber ->
-                                                viewModel.callContact(phoneNumber)
-                                            },
-                                            modifier = Modifier.fillMaxSize(),
-                                            onContactLongClick = { contact ->
-                                                if (!uiState.isSelectionMode) {
-                                                    viewModel.sendEvent(
-                                                        ContactUiEvent.ToggleSelectionMode(
-                                                            true
-                                                        )
-                                                    )
-                                                    viewModel.sendEvent(
-                                                        ContactUiEvent.ToggleContactSelection(
-                                                            contact.id
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                        )
-                                    }
+                                            )
+                                        },
+                                        onCallClick = { phoneNumber ->
+                                            viewModel.callContact(
+                                                phoneNumber
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxSize()
+                                    )
                                 }
 
                                 ContactTab.GROUPS -> {
@@ -476,50 +369,30 @@ fun ContactScreen(
                                 }
 
                                 ContactTab.SEARCH -> {
-                                    // Handled in CONTACTS tab with search query
-                                    if (searchResultsPagingItems.itemCount == 0 && searchResultsPagingItems.loadState.refresh !is LoadState.Loading) {
-                                        EmptySearchView(uiState.searchQuery)
-                                    } else {
-                                        ContactPagingList(
-                                            pagingItems = searchResultsPagingItems,
-                                            viewMode = uiState.viewMode,
-                                            isSelectionMode = false,
-                                            selectedContacts = emptySet(),
-                                            onContactClick = { contact ->
-                                                viewModel.sendEvent(
-                                                    ContactUiEvent.SelectContact(
-                                                        contact.id
-                                                    )
+                                    ContactListOrEmpty(
+                                        pagingItems = currentItems,
+                                        emptyMessage = "No results for '${uiState.searchQuery}'",
+                                        viewMode = uiState.viewMode,
+                                        onContactClick = { contact ->
+                                            viewModel.sendEvent(
+                                                ContactUiEvent.SelectContact(contact.id)
+                                            )
+                                        },
+                                        onFavoriteClick = { contact, isStarred ->
+                                            viewModel.sendEvent(
+                                                ContactUiEvent.ToggleFavorite(
+                                                    contact.id,
+                                                    !isStarred
                                                 )
-                                            },
-                                            onFavoriteClick = { contact, isStarred ->
-                                                viewModel.sendEvent(
-                                                    ContactUiEvent.ToggleFavorite(
-                                                        contact.id,
-                                                        !isStarred
-                                                    )
-                                                )
-                                            },
-                                            onCallClick = { phoneNumber ->
-                                                viewModel.callContact(phoneNumber)
-                                            },
-                                            modifier = Modifier.fillMaxSize(),
-                                            onContactLongClick = { contact ->
-                                                if (!uiState.isSelectionMode) {
-                                                    viewModel.sendEvent(
-                                                        ContactUiEvent.ToggleSelectionMode(
-                                                            true
-                                                        )
-                                                    )
-                                                    viewModel.sendEvent(
-                                                        ContactUiEvent.ToggleContactSelection(
-                                                            contact.id
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                        )
-                                    }
+                                            )
+                                        },
+                                        onCallClick = { phoneNumber ->
+                                            viewModel.callContact(
+                                                phoneNumber
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxSize()
+                                    )
                                 }
                             }
                         }
@@ -563,10 +436,48 @@ fun ContactScreen(
             }
         )
     }
-
-
 }
 
+
+@Composable
+private fun ContactListOrEmpty(
+    pagingItems: LazyPagingItems<ContactQuickInfo>,
+    emptyMessage: String,
+    viewMode: ViewMode,
+    isSelectionMode: Boolean = false,
+    selectedContacts: Set<String> = emptySet(),
+    onContactClick: (ContactQuickInfo) -> Unit,
+    onContactLongClick: (ContactQuickInfo) -> Unit = {},
+    onFavoriteClick: (ContactQuickInfo, Boolean) -> Unit,
+    onCallClick: (String) -> Unit,
+    onAddClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    if (pagingItems.itemCount == 0 && pagingItems.loadState.refresh !is LoadState.Loading) {
+        if (onAddClick != null) {
+            EmptyContactsView(message = emptyMessage, onAddClick = onAddClick)
+        } else {
+            Text(
+                text = emptyMessage,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .wrapContentSize(Alignment.Center)
+            )
+        }
+    } else {
+        ContactPagingList(
+            pagingItems = pagingItems,
+            viewMode = viewMode,
+            isSelectionMode = isSelectionMode,
+            selectedContacts = selectedContacts,
+            onContactClick = onContactClick,
+            onContactLongClick = onContactLongClick,
+            onFavoriteClick = onFavoriteClick,
+            onCallClick = onCallClick,
+            modifier = modifier
+        )
+    }
+}
 
 private fun handleContactClick(
     contact: ContactQuickInfo,

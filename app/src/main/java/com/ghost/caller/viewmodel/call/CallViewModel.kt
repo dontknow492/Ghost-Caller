@@ -1,5 +1,5 @@
 // CallViewModel.kt
-package com.ghost.caller.presentation.call
+package com.ghost.caller.viewmodel.call
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -22,33 +22,39 @@ import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
-import com.ghost.caller.service.CallManager // Added CallManager import
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import com.ghost.caller.models.ContactQuickInfo
+import com.ghost.caller.repository.ContactFilter
+import com.ghost.caller.repository.ContactRepository
+import com.ghost.caller.repository.ContactSort
+import com.ghost.caller.repository.normalizeNumber
+import com.ghost.caller.service.CallManager
 import com.ghost.caller.service.CallService
-import com.ghost.caller.viewmodel.call.AudioRoute
-import com.ghost.caller.viewmodel.call.CallError
-import com.ghost.caller.viewmodel.call.CallEvent
-import com.ghost.caller.viewmodel.call.CallQuality
-import com.ghost.caller.viewmodel.call.CallSideEffect
-import com.ghost.caller.viewmodel.call.CallState
-import com.ghost.caller.viewmodel.call.CallStatus
-import com.ghost.caller.viewmodel.call.ContactSuggestion
-import com.ghost.caller.viewmodel.call.ErrorCode
-import com.ghost.caller.viewmodel.call.NetworkType
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
 class CallViewModel(
-    application: Application
+    application: Application,
+    contactRepository: ContactRepository
 ) : AndroidViewModel(application) {
 
     private val applicationContext = application
@@ -83,6 +89,31 @@ class CallViewModel(
     private var telephonyCallback: TelephonyCallback? = null
     private var phoneStateListener: PhoneStateListener? = null
 
+    @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+    val suggestions: Flow<PagingData<ContactQuickInfo>> =
+        _state
+            .map { it.dialedNumber }
+            .map { it.trim() }
+
+            .distinctUntilChanged()
+            .debounce(250) // ⚡ slightly faster for typing UX
+            .flatMapLatest { query ->
+
+                if (query.isBlank()) {
+                    return@flatMapLatest flowOf(PagingData.empty())
+                }
+
+                // 🔥 Normalize for better matching
+                val normalized = normalizeNumber(query)
+
+                contactRepository.searchContactsPaged(
+                    query = normalized,
+                    filter = ContactFilter.ALL,
+                    sortBy = ContactSort.RECENT_DESC // better UX for suggestions
+                )
+            }
+            .cachedIn(viewModelScope) // ✅ correct for paging
+
     init {
         viewModelScope.launch {
             _event.collect { event ->
@@ -110,7 +141,6 @@ class CallViewModel(
             is CallEvent.DeleteDigit -> deleteDigit()
             is CallEvent.SetNumber -> setNumber(event.number)
             is CallEvent.ClearNumber -> clearNumber()
-            is CallEvent.SearchContacts -> searchContacts(event.query)
             is CallEvent.SelectContactSuggestion -> selectContactSuggestion(event.contact)
 
             is CallEvent.InitiateCall -> initiateCall()
@@ -162,7 +192,6 @@ class CallViewModel(
                 dialedNumberFormatted = formatPhoneNumber(newNumber)
             )
         }
-        searchContacts(_state.value.dialedNumber)
     }
 
     private fun deleteDigit() {
@@ -175,11 +204,6 @@ class CallViewModel(
                 dialedNumberFormatted = formatPhoneNumber(newNumber)
             )
         }
-        if (_state.value.dialedNumber.isNotEmpty()) {
-            searchContacts(_state.value.dialedNumber)
-        } else {
-            _state.update { it.copy(suggestions = emptyList()) }
-        }
     }
 
     private fun setNumber(number: String) {
@@ -189,7 +213,6 @@ class CallViewModel(
                 dialedNumberFormatted = formatPhoneNumber(number)
             )
         }
-        searchContacts(number)
     }
 
     private fun clearNumber() {
@@ -197,32 +220,15 @@ class CallViewModel(
             it.copy(
                 dialedNumber = "",
                 dialedNumberFormatted = "",
-                suggestions = emptyList()
             )
         }
     }
 
-    private fun searchContacts(query: String) {
-        if (query.length < 2) {
-            _state.update { it.copy(suggestions = emptyList()) }
-            return
-        }
 
-        viewModelScope.launch {
-            // Search contacts from repository
-            val suggestions = getContactSuggestions(query)
-            _state.update { it.copy(suggestions = suggestions) }
-        }
-    }
+    private fun selectContactSuggestion(contact: ContactQuickInfo) {
+        val phoneNumber = contact.primaryPhoneNumber ?: return
 
-    private fun selectContactSuggestion(contact: ContactSuggestion) {
-        _state.update {
-            it.copy(
-                dialedNumber = contact.number,
-                dialedNumberFormatted = formatPhoneNumber(contact.number),
-                suggestions = emptyList()
-            )
-        }
+        setNumber(phoneNumber)
     }
 
     // ========== Call Actions ==========
@@ -373,15 +379,17 @@ class CallViewModel(
 
     private fun endCall() {
         Timber.i("Ending Call for phone: ${_state.value.phoneNumber}")
-        if (_state.value.callStatus == CallStatus.Active ||
-            _state.value.callStatus == CallStatus.Connecting ||
-            _state.value.callStatus == CallStatus.Dialing ||
-            _state.value.callStatus == CallStatus.Ringing
+        if (_state.value.callStatus in listOf(
+                CallStatus.Active,
+                CallStatus.Connecting,
+                CallStatus.Dialing,
+                CallStatus.Ringing
+            )
         ) {
-            // 1. ACTUALLY disconnect the call at the Telecom System level
+            // 1. ACTUALLY disconnect the call
             CallManager.endCall()
 
-            // 2. Update UI State
+            // 2. Update UI state to show disconnecting
             _state.update {
                 it.copy(
                     callStatus = CallStatus.Disconnecting,
@@ -392,18 +400,18 @@ class CallViewModel(
             sendSideEffect(CallSideEffect.EndCall)
             stopCallTimer()
 
+            // 3. Immediately mark call as disconnected and hide call screen
             _state.update {
                 it.copy(
                     callStatus = CallStatus.Disconnected,
-                    isCallEnding = false,
                     isCallScreenVisible = false,
                     isCallConnected = false
                 )
             }
 
-            // Reset after delay
+            // 4. Delay for cleanup, then reset state and navigate back
             viewModelScope.launch {
-                delay(1000)
+                delay(500) // small delay for animation or UI
                 _state.update {
                     it.copy(
                         callStatus = CallStatus.Idle,
@@ -412,12 +420,18 @@ class CallViewModel(
                         isMuted = false,
                         isSpeakerOn = false,
                         isOnHold = false,
-                        isRecording = false
+                        isRecording = false,
+                        isCallScreenVisible = false, // extra safety
+                        isIncomingCallScreenVisible = false
                     )
                 }
+
+                // Trigger navigation back so DialerScreen is shown
+                sendSideEffect(CallSideEffect.EndCall)
             }
         }
     }
+
 
     private fun toggleMute() {
         val newMuteState = !_state.value.isMuted
@@ -522,7 +536,7 @@ class CallViewModel(
         sendSideEffect(CallSideEffect.ChangeAudioRouteCall(route))
     }
 
-    // ========== Contact Actions ==========
+// ========== Contact Actions ==========
 
     private fun addToContacts(number: String, name: String?) {
         sendSideEffect(CallSideEffect.OpenAddContact(number, name))
@@ -532,7 +546,7 @@ class CallViewModel(
         sendSideEffect(CallSideEffect.OpenBlockNumber(number))
     }
 
-    // ========== System Event Handlers ==========
+// ========== System Event Handlers ==========
 
     private fun updateCallState(status: CallStatus, number: String?) {
         val name = number?.let { getContactName(it) }
@@ -626,7 +640,7 @@ class CallViewModel(
         }
     }
 
-    // ========== UI Actions ==========
+// ========== UI Actions ==========
 
     private fun dismissError() {
         _state.update { it.copy(error = null) }
@@ -651,7 +665,7 @@ class CallViewModel(
         initiateCall()
     }
 
-    // ========== Call Timer Management ==========
+// ========== Call Timer Management ==========
 
     private fun startCallTimer() {
         stopCallTimer()
@@ -672,7 +686,7 @@ class CallViewModel(
         durationTimerJob = null
     }
 
-    // ========== Call Service Observation ==========
+// ========== Call Service Observation ==========
 
     private fun observeCallService() {
         viewModelScope.launch {
@@ -748,7 +762,7 @@ class CallViewModel(
         }
     }
 
-    // ========== Phone State Listener ==========
+// ========== Phone State Listener ==========
 
     @SuppressLint("ObsoleteSdkInt")
     private fun registerPhoneStateListener() {
@@ -798,7 +812,7 @@ class CallViewModel(
         }
     }
 
-    // ========== Network Observation ==========
+// ========== Network Observation ==========
 
     private fun observeNetworkChanges() {
         // Simplified - in production, use ConnectivityManager
@@ -809,7 +823,7 @@ class CallViewModel(
         }
     }
 
-    // ========== Permission Management ==========
+// ========== Permission Management ==========
 
     private fun checkPermissions() {
         val permissions = mapOf(
@@ -835,7 +849,7 @@ class CallViewModel(
         sendEvent(CallEvent.PermissionsChanged(permissions))
     }
 
-    // ========== Helper Functions ==========
+// ========== Helper Functions ==========
 
     fun getContactName(number: String): String? {
         if (number.isEmpty()) return null
@@ -864,10 +878,6 @@ class CallViewModel(
         return name
     }
 
-    private fun getContactSuggestions(query: String): List<ContactSuggestion> {
-        // Simplified - in production, query from ContactRepository
-        return emptyList()
-    }
 
     private fun formatPhoneNumber(number: String): String {
         if (number.isEmpty()) return ""

@@ -12,10 +12,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
-import com.ghost.caller.presentation.call.CallViewModel
 import com.ghost.caller.ui.navigation.AppNavigation
 import com.ghost.caller.ui.screens.PermissionsWrapper
 import com.ghost.caller.ui.theme.CallerTheme
+import com.ghost.caller.viewmodel.call.CallViewModel
 
 // --- ENTRY POINT ---
 // ---------------------------
@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             CallerTheme(
                 isDarkTheme = isSystemInDarkTheme(),
-                dynamicColor = true
+                dynamicColor = false
             ) {
                 PermissionsWrapper(permissions = requiredPermissions) {
                     // This ONLY shows up if all permissions are true
