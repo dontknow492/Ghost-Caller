@@ -60,7 +60,7 @@
         </activity>
 
         <activity
-            android:name=".ui.activity.CallActivity"
+            android:name=".CallActivity"
             android:exported="false"
             android:launchMode="singleTop"/>
 

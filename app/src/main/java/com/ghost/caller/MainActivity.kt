@@ -1,6 +1,5 @@
 package com.ghost.caller
 
-//import com.ghost.caller.viewmodel.call.CallViewModel
 import android.app.role.RoleManager
 import android.content.Intent
 import android.os.Build
@@ -15,7 +14,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import com.ghost.caller.ui.navigation.AppNavigation
 import com.ghost.caller.ui.screens.PermissionsWrapper
 import com.ghost.caller.ui.theme.CallerTheme
-import com.ghost.caller.viewmodel.call.CallViewModel
+import timber.log.Timber
 
 // --- ENTRY POINT ---
 // ---------------------------
@@ -28,9 +27,11 @@ class MainActivity : ComponentActivity() {
     ) {
         // Check the status after the user interacts with the system prompt
         if (checkIfDefaultDialer()) {
+            Timber.d("Successfully set as the default dialer.")
             Toast.makeText(this, "Success! App is now the default dialer.", Toast.LENGTH_SHORT)
                 .show()
         } else {
+            Timber.w("User declined to set app as the default dialer.")
             Toast.makeText(
                 this,
                 "App must be the default dialer to receive calls.",
@@ -38,11 +39,10 @@ class MainActivity : ComponentActivity() {
             ).show()
         }
     }
-    private lateinit var viewModel: CallViewModel
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
 
         val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             listOf(
@@ -67,8 +67,6 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-
-
         setContent {
             CallerTheme(
                 isDarkTheme = isSystemInDarkTheme(),
@@ -79,7 +77,6 @@ class MainActivity : ComponentActivity() {
                     AppNavigation()
                 }
             }
-
         }
 
         requestDefaultDialerRole()
@@ -100,8 +97,12 @@ class MainActivity : ComponentActivity() {
     // 4. The function that actually triggers the system popup
     private fun requestDefaultDialerRole() {
         // If we are already the default dialer, do nothing!
-        if (checkIfDefaultDialer()) return
+        if (checkIfDefaultDialer()) {
+            Timber.d("App is already set as the default dialer.")
+            return
+        }
 
+        Timber.d("Requesting default dialer role...")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Approach for Android 10 and above
             val roleManager = getSystemService(ROLE_SERVICE) as RoleManager
@@ -118,4 +119,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
